@@ -1,0 +1,66 @@
+#!/usr/bin/dumb-init /bin/sh
+
+# config
+__FISSION_RUNSVDIR="/etc/service"
+__FISSION_LOGDIR="/var/log"
+__FISSION_PRIMARY="runsvdir -P ${__FISSION_RUNSVDIR}"
+__FISSION_ENV_FILE="/etc/container_env/env.json"
+__FISSION_SERVICE_FILE="/etc/container_env/services.json"
+
+
+### replace PID1
+if [ $$ -eq 1 ]; then
+	echo spawning dumb-init as PID1
+	exec dumb-init "${0}" "${@}"
+fi
+
+
+### do fission
+# # check arguments
+# __FISSION_USAGE="usage: fission command [options] [-- command2 [options]]"
+# if [ ${#} -eq 0 ]; then
+#     echo ${__FISSION_USAGE}
+#     exit 1
+# fi
+
+# if [ "${1}" = "--" ]; then
+#     echo ${__FISSION_USAGE}
+#     exit 1
+# fi
+
+### load env
+eval $({ cat ${__FISSION_ENV_FILE} 2>/dev/null || echo '{}'; } | jq -r 'to_entries|map("export \(.key)=\(.value|@sh);")|.[]')
+
+### create services
+# logging with stdout and stderr to file + stderr to screen: cmd args 2>&1 >logfile | tee -a logfile
+eval $({ cat ${__FISSION_SERVICE_FILE} 2>/dev/null || echo '{}'; } | jq -r 'to_entries|map("mkdir -p ${__FISSION_RUNSVDIR}/\(.key); echo -e \"#!/bin/sh\\n{ \(.value|match("(^.*[^;])(;\\s*)?").captures[0].string); } 2>&1 >> ${__FISSION_LOGDIR}/\(.key).log | tee -a ${__FISSION_LOGDIR}/\(.key).log\" >> ${__FISSION_RUNSVDIR}/\(.key)/run; chmod +x ${__FISSION_RUNSVDIR}/\(.key)/run;")|.[]')
+
+### exec
+# build primary command til -- or end of options
+while [ ${#} -ne 0 ] && [ "${1}" != "--" ]; do
+    __FISSION_PRIMARY="${__FISSION_PRIMARY} \"${1}\""
+    shift
+done
+
+# has a secondary command after -- ?
+if [ "${1}" = "--" ] && [ ${#} -gt 1 ]; then
+	# run primary command in background
+    __FISSION_PRIMARY="${__FISSION_PRIMARY} &"
+    shift
+else
+	# run primary command in foreground and replace process
+    __FISSION_PRIMARY="exec ${__FISSION_PRIMARY}"
+fi
+
+eval "${__FISSION_PRIMARY}"
+# -> process replaced here if no secondary command is given
+# --
+
+
+# run secondary command and replace process
+while [ ${#} -ne 0 ]; do
+    __FISSION_SECONDARY="${__FISSION_SECONDARY} \"${1}\""
+    shift
+done
+
+eval "exec ${__FISSION_SECONDARY}"
