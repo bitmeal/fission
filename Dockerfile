@@ -7,8 +7,8 @@ RUN \
     apk add dumb-init runit jq && \
     mkdir -p /etc/service
 
-# add "service"
 COPY services.json /etc/container_env/services.json
+RUN apk add pstree
 
 ENTRYPOINT ["/bin/ash", "/usr/bin/fission"]
 CMD []

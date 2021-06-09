@@ -1,3 +1,4 @@
+#!/bin/sh
 #!/usr/bin/dumb-init /bin/sh
 
 # config
@@ -29,11 +30,39 @@ fi
 # fi
 
 ### load env
-eval $({ cat ${__FISSION_ENV_FILE} 2>/dev/null || echo '{}'; } | jq -r 'to_entries|map("export \(.key)=\(.value|@sh);")|.[]')
+# eval $({ cat ${__FISSION_ENV_FILE} 2>/dev/null || echo '{}'; } | jq -r 'to_entries|map("export \(.key)=\(.value|@sh);")|.[]')
+if [ -e "${__FISSION_ENV_FILE}" ] ; then
+    for __FISSION_ENV_VAR in $(jq -r 'keys|.[]' "${__FISSION_ENV_FILE}"); do
+        __FISSION_ENV_VAR_VAL=$(jq -r ".${__FISSION_ENV_VAR}" "${__FISSION_ENV_FILE}")
+        echo "${__FISSION_ENV_VAR}=${__FISSION_ENV_VAR_VAL}"
+        export ${__FISSION_ENV_VAR}="${__FISSION_ENV_VAR_VAL}"
+        unset __FISSION_ENV_VAR_VAL
+    done
+fi
+
+### source /etc/init.d/**
+if [ -e "/etc/rc.local" ] ; then
+    echo "sourcing: /etc/rc.local"
+    source /etc/rc.local
+fi
+for INITD_FILE in $(find -L /etc/init.d -type f -executable -name '*'); do
+    if [ -e "${INITD_FILE}" ] ; then
+        echo "sourcing: ${INITD_FILE}"
+        source "${INITD_FILE}"
+    fi
+done
 
 ### create services
 # logging with stdout and stderr to file + stderr to screen: cmd args 2>&1 >logfile | tee -a logfile
 eval $({ cat ${__FISSION_SERVICE_FILE} 2>/dev/null || echo '{}'; } | jq -r 'to_entries|map("mkdir -p ${__FISSION_RUNSVDIR}/\(.key); echo -e \"#!/bin/sh\\n{ \(.value|match("(^.*[^;])(;\\s*)?").captures[0].string); } 2>&1 >> ${__FISSION_LOGDIR}/\(.key).log | tee -a ${__FISSION_LOGDIR}/\(.key).log\" >> ${__FISSION_RUNSVDIR}/\(.key)/run; chmod +x ${__FISSION_RUNSVDIR}/\(.key)/run;")|.[]')
+if [ -e "${__FISSION_ENV_FILE}" ] ; then
+    for __FISSION_ENV_VAR in $(jq -r 'keys|.[]' "${__FISSION_ENV_FILE}"); do
+        __FISSION_ENV_VAR_VAL=$(jq -r ".${__FISSION_ENV_VAR}" "${__FISSION_ENV_FILE}")
+        echo "${__FISSION_ENV_VAR}=${__FISSION_ENV_VAR_VAL}"
+        export ${__FISSION_ENV_VAR}="${__FISSION_ENV_VAR_VAL}"
+        unset __FISSION_ENV_VAR_VAL
+    done
+fi
 
 ### exec
 # build primary command til -- or end of options
