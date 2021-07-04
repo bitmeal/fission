@@ -1,4 +1,0 @@
-{
-    "sleep10": "sleep 10; echo slept",
-    "du5": "sleep 5; du -sh /;"
-}

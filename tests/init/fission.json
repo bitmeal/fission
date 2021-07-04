@@ -1,0 +1,7 @@
+{
+    "silent": true,
+    "init": {
+        "01_init.d": "/testbin/init.d/",
+        "99_01.sh": "/testbin/init.d/01.sh"
+    }
+}

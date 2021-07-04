@@ -1,0 +1,6 @@
+{
+    "silent": true,
+    "init": {
+        "source": "/testbin/source.sh"
+    }
+}

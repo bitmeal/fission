@@ -1,0 +1,7 @@
+{
+    "silent": true,
+    "env": {
+        "FOO": "fission",
+        "BAR": "init"
+    }
+}

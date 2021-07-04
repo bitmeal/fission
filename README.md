@@ -66,7 +66,7 @@ ENTRYPOINT ["/usr/bin/fission", "/opt/app/app", "app_param"]
 ```bash
 docker run -it mycontainer -- /bin/sh
 ```
-When running an auxiliary process, your main process' output will be hidden and logged to `/var/log/app/`, while additionally forwarding *stderr* to screen. To disable *stderr* forwarding, configure **fission init** as silent (see *services* section).
+When running an auxiliary process, your main process' output will be logged to `/var/log/app/`, while additionally forwarding *stderr* to screen. To disable *stderr* forwarding, configure **fission init** to silence stderr (see *services* section).
 
 ## services
 Service supervision is provided by `runit` and its `runsvdir`. Configure your services as a dictionary under the key `services` in `fission.json`. `runit` compatible configurations will automatically be generated when calling `fission`.
@@ -82,11 +82,11 @@ Manually created `runit` services from `/etc/service` will be launched, but will
 ### automatic logging
 A logger will be created for all services configured in your `fission.json`. *stdout* and *stderr* are merged and logged in `/var/log/<service_name>/`, using `svlogd` with automatic log rotation.
 
-Additionally *stderr* is forwarded to `/dev/stderr` and will appear in your containers' output ("on screen")! To disable this "on screen" forwarding of *stderr*, configure **fission init** as `"silent": true`:
+Additionally *stderr* is forwarded to `/dev/stderr` and will appear in your containers' output ("on screen")! To disable this "on screen" forwarding of *stderr*, configure **fission init** as `"stderr": false`:
 ```json
 // fission.json [/etc/fission/fission.json]
 {
-    "silent": true
+    "stderr": false
 }
 ```
 
@@ -102,7 +102,7 @@ Environment variables are configured as a dictionary under key `env`, with the v
 ```
 
 ## init scripts
-Provide init scripts to be `source`d in your environment as a dictionary under the key `init`. The keys/names of your init scripts will be used for ordering and the overlay functionality (see below). Additionally, `/etc/rc.local` and all executable scripts in `/etc/init.d/**` are sourced.
+Provide init scripts, or directories containing init scripts, to be **`source`d** in your environment as a dictionary under the key `init`. The keys/names of your init scripts will be used for ordering and the overlay functionality (see below).
 ```json
 // fission.json [/etc/fission/fission.json]
 {
@@ -114,6 +114,17 @@ Provide init scripts to be `source`d in your environment as a dictionary under t
 
 ## configuration overlays
 To alter your configuration, you can mount additional json files in `/etc/fission/overlays/`. Overlay configuration files will be read and merged into the original config in lexicographical order. Dictionaries are "deep-merged". Setting an existing dictionary item as `null` will remove the entry from the dictionary.
+
+## silencing **fission** output
+As seen in the service section, forwarding of stderr of background services can be disabled. To disable all output of **fission init**, configure it as `"silent": true`.
+```json
+// fission.json [/etc/fission/fission.json]
+// silence all output
+{
+    "silent": true,
+    "stderr": false
+}
+```
 
 ## notes 📜
 
@@ -129,5 +140,5 @@ To alter your configuration, you can mount additional json files in `/etc/fissio
 
 ### legacy support
 Compatible with `pushion/base-image`s' `my_init.py`; except for environment configuration.
-* init from `/etc/rc.local` and `/etc/init.d/**`
+* ~~init from `/etc/rc.local` and `/etc/init.d/**`~~
 * run manually created `runit` services from `/etc/service/*`
