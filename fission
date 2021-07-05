@@ -4,6 +4,7 @@
 ### config
 #FISSION_VERBOSE="false"
 __FISSION_FILE="/etc/fission/fission.json"
+__FISSION_OVERLAY_DIR="/etc/fission/overlays"
 __FISSION_RUNSVDIR="/etc/service"
 __FISSION_LOGDIR="/var/log"
 __FISSION_RUNSVDIR_CMD="runsvdir -P ${__FISSION_RUNSVDIR}"
@@ -34,8 +35,6 @@ cmdl_redirect_print()
 {
     if ${__FISSION_STDERR}; then
         # forward stderr to terminal and log
-        # echo "__FISSION_STDERR_PIPE=\"/var/run/\$(mktemp -u fifo.XXXXXX)\" && mkfifo \${__FISSION_STDERR_PIPE} && exec 127<>\${__FISSION_STDERR_PIPE} && rm \${__FISSION_STDERR_PIPE} && exec 2>&127 && tee ${__FISSION_STDERR_TARGET} <&127 & { $@; }"
-        # echo "{ { $@; } 2>&1 1>&127 | tee ${__FISSION_STDERR_TARGET} 1>&127; } 127>&1"
         echo "{ { $@; } 2>&1 1>&127 | tee ${__FISSION_STDERR_TARGET}; } 127>&1"
     else
         # hide stderr from terminal
@@ -55,21 +54,30 @@ if [ "${1}" = "--" ]; then
     exit 1
 fi
 
-# check fission.json exists and valid json
+# check fission.json exists
 if [ ! -f "${__FISSION_FILE}" ] ; then
-    echo "configuration file /etc/fission/fission.json missing"
-    exit 1
-fi
-if ! jq '.' "${__FISSION_FILE}" > /dev/null; then
-    echo "cannot parse /etc/fission/fission.json; review jq error output above"
-    exit 1
-fi
-if [ "$(jq -r 'type' ${__FISSION_FILE})" != "object" ]; then
-    echo "configuration file /etc/fission/fission.json is not an object"
+    echo "configuration file ${__FISSION_FILE} missing"
     exit 1
 fi
 
-# TODO: build overlays
+# test fission.json and overlays
+LC_COLLATE=C
+__FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
+for __FISSION_CONFIG_FILE in ${__FISSION_FILE} ${__FISSION_OVERLAYS}; do
+    if ! jq '.' "${__FISSION_CONFIG_FILE}" > /dev/null; then
+        echo "cannot parse ${__FISSION_CONFIG_FILE}; review jq error output above"
+        exit 1
+    fi
+    if [ "$(jq -r 'type' ${__FISSION_CONFIG_FILE})" != "object" ]; then
+        echo "configuration file ${__FISSION_CONFIG_FILE} is not an object"
+        exit 1
+    fi
+done
+
+# build config from overlays
+# jq -rs 'reduce .[] as $item ({}; . * $item) | with_entries(.value = (.value | with_entries(select( .value != null ))))' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
+# pre jq 1.6 compatible
+__FISSION_CONFIG=$(jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS})
 
 ### fetch fission config options
 # verbosity
@@ -77,7 +85,7 @@ if [ "${FISSION_VERBOSE}" = "" ]; then
     FISSION_VERBOSE="false"
 fi
 # silent
-__FISSION_SILENT=$(jq '.silent // false' ${__FISSION_FILE})
+__FISSION_SILENT=$(echo "${__FISSION_CONFIG}" | jq '.silent // false')
     # disable silence when verbose
     if ${FISSION_VERBOSE}; then
         __FISSION_SILENT="false"
@@ -90,7 +98,7 @@ __FISSION_SILENT=$(jq '.silent // false' ${__FISSION_FILE})
     log_verbose "# silent: ${__FISSION_SILENT}"
 
 # stderr forwarding
-__FISSION_STDERR=$(jq -e 'if has("stderr") then .stderr else true end' ${__FISSION_FILE})
+__FISSION_STDERR=$(echo "${__FISSION_CONFIG}" | jq -e 'if has("stderr") then .stderr else true end')
     log_verbose "# stderr: ${__FISSION_STDERR}"
 
 
@@ -106,8 +114,8 @@ fi
 ### load env
 # TODO: use jq @sh quoting
 log "> loading env..."
-for __FISSION_ENV_VAR in $(jq -r '.env // empty | keys | .[]' "${__FISSION_FILE}"); do
-    __FISSION_ENV_VAR_VAL=$(jq -r ".env.\"${__FISSION_ENV_VAR}\"" "${__FISSION_FILE}")
+for __FISSION_ENV_VAR in $(echo "${__FISSION_CONFIG}" | jq -r '.env // empty | keys | .[]'); do
+    __FISSION_ENV_VAR_VAL=$(echo "${__FISSION_CONFIG}" | jq -r ".env.\"${__FISSION_ENV_VAR}\"")
     log "- ${__FISSION_ENV_VAR}"
     log_verbose '`-: '"${__FISSION_ENV_VAR_VAL}"
     export ${__FISSION_ENV_VAR}="${__FISSION_ENV_VAR_VAL}"
@@ -116,8 +124,8 @@ done
 
 ### source init scripts
 log "> running init tasks..."
-for __FISSION_INIT in $(jq -r '.init // empty | keys | .[]' "${__FISSION_FILE}"); do
-    __FISSION_INIT_TARGET=$(jq -r ".init.\"${__FISSION_INIT}\"" "${__FISSION_FILE}")
+for __FISSION_INIT in $(echo "${__FISSION_CONFIG}" | jq -rS '.init // empty | keys | .[]'); do
+    __FISSION_INIT_TARGET=$(echo "${__FISSION_CONFIG}" | jq -r ".init.\"${__FISSION_INIT}\"")
 
     log_verbose "${__FISSION_INIT}"
     log_verbose "${__FISSION_INIT_TARGET}"
@@ -149,12 +157,11 @@ done
 # TODO: call services with init binary for signal forwarding and child reaping
 # logging with stdout and stderr to file + stderr to screen
 log "> creating services..."
-for __FISSION_SERVICE in $(jq -r '.services // empty | keys | .[]' "${__FISSION_FILE}"); do
+for __FISSION_SERVICE in $(echo "${__FISSION_CONFIG}" | jq -r '.services // empty | keys | .[]'); do
     # log "creating service: ${__FISSION_SERVICE}"
     log "- ${__FISSION_SERVICE}"
     # get service command line without trailing semicollon (";")
-    # __FISSION_SERVICE_CMDL=$(jq -r .services."${__FISSION_SERVICE}"|match('(^.*[^;])(;\\s*)?').captures[0].string "${__FISSION_FILE}")
-    __FISSION_SERVICE_CMDL=$(jq -r ".services.\"${__FISSION_SERVICE}\"" "${__FISSION_FILE}")
+    __FISSION_SERVICE_CMDL=$(echo "${__FISSION_CONFIG}" | jq -r ".services.\"${__FISSION_SERVICE}\"")
     __FISSION_SERVICE_CMDL="$(echo ${__FISSION_SERVICE_CMDL} | sed 's/;[[:space:]]*$//')"
     log_verbose '`-: '"${__FISSION_SERVICE_CMDL}"
 
@@ -162,14 +169,8 @@ for __FISSION_SERVICE in $(jq -r '.services // empty | keys | .[]' "${__FISSION_
 
     # (re)create service file
     echo "#!/bin/sh" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-    # write service with logging to /dev/stderr and combined stdout and stderr
+    # write service file with requested stderr logging mode
     cmdl_redirect_print ${__FISSION_SERVICE_CMDL} >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-    # if ${__FISSION_STDERR}; then
-    #     echo 'PIPE=$(mktemp -u fifo.XXXXXX) && mkfifo ${PIPE} && exec 127<>${PIPE} && rm ${PIPE} && tee /dev/stderr <&127 &' >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-    #     echo "{ ${__FISSION_SERVICE_CMDL}; } 2>&127" >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-    # else
-    #     echo "exec { ${__FISSION_SERVICE_CMDL}; } 2>&1" >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-    # fi
     chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
 
     # (re)create logger
@@ -200,29 +201,16 @@ if [ "${1}" = "--" ] && [ ${#} -gt 1 ]; then
     # create logging directory
     mkdir -p "${__FISSION_LOGDIR}/app"
 	# run primary command in background
-    ( setsid sh -c "$(cmdl_redirect_print ${__FISSION_PRIMARY})" | svlogd -tt ${__FISSION_LOGDIR}/app & )
-    # if ${__FISSION_STDERR}; then
-    #     # forward stderr to terminal and log
-    #     # __FISSION_STDERR_PIPE="$(mktemp -u fifo.XXXXXX)"
-    #     # ( setsid sh -c "mkfifo ${__FISSION_STDERR_PIPE} && exec 127<>${__FISSION_STDERR_PIPE} && rm ${__FISSION_STDERR_PIPE} && tee /dev/stderr <&127 & { ${__FISSION_PRIMARY}; } 2>&127 &" | svlogd ${__FISSION_LOGDIR}/app & )
-    #     ( setsid sh -c "__FISSION_STDERR_PIPE=\"/var/run/\$(mktemp -u fifo.XXXXXX)\" && mkfifo \${__FISSION_STDERR_PIPE} && exec 127<>\${__FISSION_STDERR_PIPE} && rm \${__FISSION_STDERR_PIPE} && ( tee ${__FISSION_STDERR_TARGET} <&127 & ) && exec 2>&127 && { ${__FISSION_PRIMARY}; }" | svlogd ${__FISSION_LOGDIR}/app & )
-    # else
-    #     # hide stderr from terminal
-    #     # __FISSION_PRIMARY="( setsid sh -c '${__FISSION_PRIMARY} 2>&1 | svlogd ${__FISSION_LOGDIR}/app ' & )"
-    #     ( setsid sh -c "{ ${__FISSION_PRIMARY}; } 2>&1" | svlogd ${__FISSION_LOGDIR}/app & )
-    # fi
-
     log "> running main process in background [logging to ${__FISSION_LOGDIR}/app]..."
-    # __FISSION_PRIMARY="${__FISSION_PRIMARY} &"
+    ( setsid sh -c "$(cmdl_redirect_print ${__FISSION_PRIMARY})" | svlogd -tt ${__FISSION_LOGDIR}/app & )
+
     shift
 else
 	# run primary command in foreground and replace process
     log "> starting main process..."
-    # __FISSION_PRIMARY="exec sh -c \"${__FISSION_PRIMARY}\""
     exec sh -c "${__FISSION_PRIMARY}"
 fi
 
-# eval "${__FISSION_PRIMARY}"
 # -> process replaced here if no auxilliary command is given
 # --
 

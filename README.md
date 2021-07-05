@@ -102,7 +102,7 @@ Environment variables are configured as a dictionary under key `env`, with the v
 ```
 
 ## init scripts
-Provide init scripts, or directories containing init scripts, to be **`source`d** in your environment as a dictionary under the key `init`. The keys/names of your init scripts will be used for ordering and the overlay functionality (see below).
+Provide init scripts, or directories containing init scripts, to be **`source`d** in your environment as a dictionary under the key `init`. The keys/names of your init scripts will be used to determine sourcing order and enable overlay functionality (see below). Ordering is based on unicode codepoint order, as implemented by `jq`.
 ```json
 // fission.json [/etc/fission/fission.json]
 {
@@ -113,7 +113,7 @@ Provide init scripts, or directories containing init scripts, to be **`source`d*
 ```
 
 ## configuration overlays
-To alter your configuration, you can mount additional json files in `/etc/fission/overlays/`. Overlay configuration files will be read and merged into the original config in lexicographical order. Dictionaries are "deep-merged". Setting an existing dictionary item as `null` will remove the entry from the dictionary.
+To alter your configuration, you can mount additional json files in `/etc/fission/overlays/`. Overlay configuration files will be read and merged into the original config, in the order established by shell globbing with the collating sequence for `LC_COLLATE=C`. Dictionaries are "deep-merged". To remove **individual** items from the configuration set their value to `null`; removing items is performed after merging.
 
 ## silencing **fission** output
 As seen in the service section, forwarding of stderr of background services can be disabled. To disable all output of **fission init**, configure it as `"silent": true`.
