@@ -1,11 +1,11 @@
-# 🔱 fission init 💨
+# 💥 fission init
 > multi-process docker init stack. *lightweight, simple and without reinventing the wheel*
 
 The *"PID1-problem"*, zombie processes, signal forwarding and running multiple processes in docker containers has been discussed in length. While well tested and widely supported solutions exist, running multiple processes and setting up the required environment does not come in a simple and light-weight package. The most notable "all-in-one" solutions being `s6-overlay` and `pushion/base-image`s' `my_init.py`; which either come with a high (perceived) level of complexity or a hefty size penalty (i.e. due to the required python interpreter).
 
 **fission init** simplifies the process of setting up your environment, running init scripts, supervising services with automatic logging and allows for simple introspection. All by means of a simple json file.
 
-Requirements are: A POSIX compatible shell, `dumb-init` or `tini` as PID1, `runit` for service supervision and a `jq` binary. Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided.
+Requirements are: A POSIX compatible shell, `dumb-init` or `tini` as PID1, `runit` for service supervision and a `jq` binary. Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided (*see bottom of this README*).
 
 > 📌 **why "fission"?**
 > 
