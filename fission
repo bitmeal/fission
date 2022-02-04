@@ -1,5 +1,4 @@
-#!/bin/sh
-#!/usr/bin/dumb-init /bin/sh
+#!/usr/bin/env sh
 
 ### config
 #FISSION_VERBOSE="false"
@@ -54,6 +53,14 @@ if [ "${1}" = "--" ]; then
     exit 1
 fi
 
+# update path to use local binaries
+__FISSION_PATH_MODIFIED="false"
+if [ -z ${FISSION_PATH} ]; then
+    export FISSION_PATH=$(dirname $(readlink -f "$0"))
+    export PATH=${FISSION_PATH}:${PATH}
+    __FISSION_PATH_MODIFIED="true"
+fi
+
 # check fission.json exists
 if [ ! -f "${__FISSION_FILE}" ] ; then
     echo "configuration file ${__FISSION_FILE} missing"
@@ -102,14 +109,18 @@ __FISSION_STDERR=$(echo "${__FISSION_CONFIG}" | jq -e 'if has("stderr") then .st
     log_verbose "# stderr: ${__FISSION_STDERR}"
 
 
-### detect init system
-# TODO: detect init system
+# postponed logging of path modification; after config has been read to respect silence flag
+if ${__FISSION_PATH_MODIFIED}; then
+    log "> updating PATH as ${FISSION_PATH}:"'${PATH}'
+fi
+
 
 ### replace PID1
 if [ $$ -eq 1 ]; then
-	log "> spawning dumb-init as PID1..."
-	exec dumb-init "${0}" "${@}"
+	log "> spawning fpco/pid1 as PID1..."
+	exec pid1 "${0}" "${@}"
 fi
+# TODO: allow fpco/pid1 SIGKILL timeout configuration
 
 ### load env
 # TODO: use jq @sh quoting

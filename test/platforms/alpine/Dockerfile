@@ -1,10 +1,12 @@
-FROM alpine
+FROM alpine:latest
 
 # add fission init
-RUN apk add --no-cache dumb-init runit jq
-# COPY fission /usr/bin/fission
-# RUN chmod +x /usr/bin/fission
+COPY --from=fission:base / /
+
+# add testing tools
+RUN apk add procps psmisc
 
 
-# ENTRYPOINT ["/usr/bin/fission"]
-# CMD []
+# use fission init
+ENTRYPOINT ["/opt/fission/bin/fission"]
+CMD []

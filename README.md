@@ -5,9 +5,15 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
 
 **fission init** simplifies the process of setting up your environment, running init scripts, supervising services with automatic logging and allows for simple introspection. All by means of a simple json file.
 
-Requirements are: A POSIX compatible shell, `dumb-init` or `tini` as PID1, `runit` for service supervision and a `jq` binary. Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided (*see bottom of this README*).
+### Requirements
+* A POSIX compatible shell
+* `fpco/pid1` as PID1
+* `runit` for service supervision
+* `jq`
 
-> 📌 **why "fission"?**
+Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided (*see bottom of this README*).
+
+### 📌 **why "fission"?**
 > 
 > 1. Fission being the scientific term for division/splitting. **fission init** allows you to "split" your single PID1 process of your container into multiple supervised processes.
 > 2. *Runit*, as well as being the core component of **fission init** for service supervision, is the name of an island. *Runit* island is a nuclear waste storage site and nuclear *fission* bomb testing site.
@@ -27,26 +33,27 @@ Requirements are: A POSIX compatible shell, `dumb-init` or `tini` as PID1, `runi
     }
 }
 ```
+* copy rootfs (`/`) from `fission:base` container image
 * configure your environment, init scripts and services in `fission.json`
 * copy your `fission.json` configuration as `/etc/fission/fission.json` in your container
-* copy `fission` to a destination of your choice within your container
-* install `dumb-init`/`tini`, `runit` and `jq`
-* call `fission` with your main command and parameters as arguments
+* call `fission`, and give your main command and its parameters as arguments, as `ENTRYPOINT`
 ```dockerfile
 # Dockerfile
-# ...
 
-# install: dumb-init/tini, runit and jq
+FROM <your-base>
+COPY --from=fission:base / /
 
-COPY fission /usr/bin/fission
-COPY fission.json /etc/fission/fission.json
-
-ENTRYPOINT ["/usr/bin/fission", "/opt/app/app", "app_param_mandatory"]
+ENTRYPOINT ["/opt/fission/bin/fission", "/opt/app/app", "app_param_mandatory"]
 CMD ["app_param_optional"]
 ```
 
+### manual setup
+
+* copy `fission` to a destination of your choice within your container
+* install `fpco/pid1`, `runit` and `jq`
+
 ## PID1
-**fission init**s' `fission` script replaces itself with a popper PID1 binary, when ran as PID1 itself. `dumb-init` and `tini` are supported, while the first is preferred for its signal forwarding capabilities. The respective binary has to reside in a location included in your PATH variable.
+**fission init**s' `fission` script replaces itself with `fpco/pid1` as popper PID1, when ran as PID1 itself. `fpco/pid1` is used for its signal forwarding capabilities to orphaned and daemonized processes.
 
 ## main & aux process
 **fission init** adheres to the idea of *one application/service per container*, while this application may depend on the presence of other services. These services are thought to be tightly coupled to your application and not to be shared outside of the container!
@@ -129,7 +136,7 @@ As seen in the service section, forwarding of stderr of background services can 
 ## notes 📜
 
 ### functionality
-* `dumb-init` or `tini` as PID1 (favours `dumb-init` for signal forwarding capabilities)
+* `fpco/pid1` as PID1
 * `runit` for multi-process supervision
 * main process to be provided with `ENTRYPOINT` and/or `CMD` (`["fission",  "main-command",  "arg"]`)
 * run auxiliary command after `--`; silencing main stdout (redirect to logging?)

@@ -1,13 +1,14 @@
-FROM ubuntu
+FROM ubuntu:latest
 
 # add fission init
+COPY --from=fission:base / /
+
+# add testing tools
 RUN \
     apt update && \
-    apt install -y dumb-init runit jq && \
-    rm -rf /var/lib/apt/lists/*
-# COPY fission /usr/bin/fission
-# RUN chmod +x /usr/bin/fission
+    apt install -y procps psmisc
 
 
-# ENTRYPOINT ["/usr/bin/fission"]
-# CMD []
+# use fission init
+ENTRYPOINT ["/opt/fission/bin/fission"]
+CMD []
