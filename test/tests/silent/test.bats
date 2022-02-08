@@ -7,8 +7,9 @@ setup() {
     _common_setup
 }
 
-@test "config/fission.json: fail on empty file" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${IMAGE} pstree
-	assert_failure
+@test "fission config: silence info logging" {
+    run -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} true
+    assert_success
+    
+    refute_output
 }
-

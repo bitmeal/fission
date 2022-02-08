@@ -7,10 +7,10 @@ setup() {
     _common_setup
 }
 
-@test "config/fission.json: empty config object ({}) is valid config" {
-    # empty json object is valid config
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${IMAGE} pstree
+@test "main: outputs to stdout and container stops after main process exits" {
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} echo 'fission-init'
     assert_success
-
+    
+    assert_equal "${output}" "fission-init"
     assert_equal "${stderr}" ""
 }

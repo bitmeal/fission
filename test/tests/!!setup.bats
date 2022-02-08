@@ -5,11 +5,11 @@ setup() {
     _common_setup
 }
 
-@test "bats common setup test" {
+@test "testing: bats common setup test" {
     run bash -c "cd $( dirname ${BATS_TEST_FILENAME} ) >/dev/null 2>&1 && pwd"
     assert_equal "${output}" "${CTX}"
 }
 
-@test "ensure image availability (build)" {
+@test "testing: ensure image availability (build)" {
     _ensure_image
 }

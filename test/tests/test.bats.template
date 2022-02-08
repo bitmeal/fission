@@ -5,16 +5,14 @@ setup() {
 
     # set common environment
     _common_setup
-
-    # ensure current test image availability
-    _ensure_image
 }
 
 @test "TESTNAME" {
     # CTX is test file location
     # IMAGE is docker image:tag for platform to test
     run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${IMAGE}
-
+    assert_success
+    
     assert_equal "${output}" "STDOUT"
     assert_equal "${stderr}" "STDERR"
 }

@@ -1,7 +1,0 @@
-{
-    "silent": true,
-    "services": {
-        "01_srv": "touch /root/01_srv; while true; do sleep 1; done",
-        "02_srv": "touch /root/02_srv; while true; do sleep 1; done"
-    }
-}

@@ -7,10 +7,12 @@ setup() {
     _common_setup
 }
 
-@test "config/fission.json: empty config object ({}) is valid config" {
-    # empty json object is valid config
+@test "fission config: verbose logging; overriding silent config" {
+    # CTX is test file location
+    # IMAGE is docker image:tag for platform to test
     run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${IMAGE} pstree
     assert_success
-
+    
+    assert_line --partial '# silent: false'
     assert_equal "${stderr}" ""
 }

@@ -1,0 +1,7 @@
+{
+    "silent": true,
+    "services": {
+        "01_srv": "mkdir -p /test_out; touch /test_out/01_srv; while true; do sleep 1; done",
+        "02_srv": "mkdir -p /test_out; touch /test_out/02_srv; while true; do sleep 1; done"
+    }
+}
