@@ -43,19 +43,6 @@ log_verbose()
     fi
 }
 
-# print commandline with apropriate stderr redirection for logging
-# > redirect output or use with substitution!
-cmdl_redirect_print()
-{
-    if ${__FISSION_STDERR}; then
-        # forward stderr to terminal and log
-        echo "{ { $@; } 2>&1 1>&127 | tee ${__FISSION_STDERR_TARGET}; } 127>&1"
-    else
-        # hide stderr from terminal
-        echo "{ $@; } 2>&1"
-    fi
-}
-
 common_config()
 {
     # verbosity
@@ -144,10 +131,6 @@ setup_init() #${@}
 
 
     ### fetch fission config
-    # build config from overlays
-    # jq -rs 'reduce .[] as $item ({}; . * $item) | with_entries(.value = (.value | with_entries(select( .value != null ))))' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
-    # pre jq 1.6 compatible
-    # export FISSION_CONFIG=$(jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS})
     export FISSION_CONFIG="$(${FISSION_SHELL} ${FISSION_PATH}/fission-getconf)"
 
     # setup common configuration variables
@@ -199,7 +182,7 @@ run()
     common_config
 
     ### load env
-    # TODO: use jq @sh quoting
+    # TODO: use jq @sh quoting?
     log "loading env..."
     for __FISSION_ENV_VAR in $(echo "${FISSION_CONFIG}" | jq -r '.env // empty | keys | .[]'); do
         __FISSION_ENV_VAR_VAL=$(echo "${FISSION_CONFIG}" | jq -r ".env.\"${__FISSION_ENV_VAR}\"")
@@ -241,16 +224,13 @@ run()
 
 
     ### create services & logging
-    # TODO: call services with init binary for signal forwarding and child reaping
     # logging with stdout and stderr to file + stderr to screen
     log "creating services..."
     mkdir -p ${__FISSION_RUNSVDIR}
     for __FISSION_SERVICE in $(echo "${FISSION_CONFIG}" | jq -r '.services // empty | keys | .[]'); do
         # log "creating service: ${__FISSION_SERVICE}"
         log "- ${__FISSION_SERVICE}"
-        # get service command line without trailing semicollon (";")
         __FISSION_SERVICE_CMDL=$(echo "${FISSION_CONFIG}" | jq -r ".services.\"${__FISSION_SERVICE}\"")
-        # __FISSION_SERVICE_CMDL="$(echo ${__FISSION_SERVICE_CMDL} | sed 's/;[[:space:]]*$//')"
         log_verbose '`-: '"${__FISSION_SERVICE_CMDL}"
 
         mkdir -p "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log"
@@ -258,7 +238,6 @@ run()
         # (re)create service file
         echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
         # write service file with requested stderr logging mode
-        # cmdl_redirect_print ${__FISSION_SERVICE_CMDL} >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
         echo "exec ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${__FISSION_SERVICE_CMDL}" >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
         chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
 
@@ -291,8 +270,6 @@ run()
         mkdir -p "${__FISSION_LOGDIR}/app"
         # run primary command in background
         log "running main process in background [logging to ${__FISSION_LOGDIR}/app]..."
-        # ( setsid "${FISSION_SHELL}" -c "$(cmdl_redirect_print ${__FISSION_PRIMARY})" | svlogd -tt ${__FISSION_LOGDIR}/app & )
-        # ( setsid ${FISSION_SHELL} -c "( ${FISSION_PATH}/fission-runsv ${__FISSION_PRIMARY} & ) | svlogd -tt ${__FISSION_LOGDIR}/app & wait" & )
         ( setsid ${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain ${__FISSION_PRIMARY} & )
 
         shift
@@ -318,6 +295,14 @@ run()
     exec "${FISSION_SHELL}" -c "${__FISSION_AUXILLIARY}"
 }
 
+
+### log/stderr redirection
+# will both run command:
+#   - in new backgrounded shell
+#   - shell as new process group leader
+# -> allows signal forwarding as this process and handlers/traps stay active
+# -> allows to forwarding signals to all child processes (including tee) by group
+
 ## run command and handle stderr redirection
 # TODO: remove additional shell call
 cmd_redirect_stderr()
@@ -328,11 +313,6 @@ cmd_redirect_stderr()
     exec 127>&1
 
     if ${__FISSION_STDERR}; then
-        # run command:
-        #   in new backgrounded shell
-        #   shell as new process group leader
-        # allows signal forwarding as this process and handlers/traps stay active
-        # allows to forwarding signals to all child processes (including tee) by group
         setsid ${FISSION_SHELL} -c "${*} 2>&1 1>&127 | setsid tee ${__FISSION_STDERR_TARGET}" &
     else
         setsid ${FISSION_SHELL} -c "${*}" 2>&1 &
@@ -343,9 +323,10 @@ cmd_redirect_stderr()
     PROC_GROUP_ID=$(ps -o pgid -p ${GROUP_LEADER_PID} | tail -n 1 | tr -d ' ')
     # PROC_GROUP_ID="$(ps -o pid,pgid | grep -E '^\s+${GROUP_LEADER_PID}\s+' | sed -E 's/\s*(\S+)\s*/\1\t/g' | cut -f 2 | tr -d '\t ')"
 
-    # install trap; make SIGINT and SIGTERM send SIGTERM to all children
+    # install trap
+    #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
+    #   - keeps tee running; will exit on broken pipe
     trap "kill -- -${PROC_GROUP_ID}" SIGINT SIGTERM
-    # trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID}; wait; exit" SIGINT SIGTERM
 
     # wait for command to finish (keep process running and forward signals)
     wait
@@ -373,11 +354,6 @@ main_redirect_stderr()
     # LOGGER_PID=$!
 
     if ${__FISSION_STDERR}; then
-        # run command:
-        #   in new backgrounded shell
-        #   shell as new process group leader
-        # allows signal forwarding as this process and handlers/traps stay active
-        # allows to forwarding signals to all child processes (including tee) by group
         setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; ${*} 2>&1 1>&127 | setsid tee ${__FISSION_STDERR_TARGET} 1>&127" &
     else
         setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; ${*} 1>&127 2>&127" &
@@ -386,26 +362,20 @@ main_redirect_stderr()
     # get group id
     GROUP_LEADER_PID=$!
     PROC_GROUP_ID=$(ps -o pgid -p ${GROUP_LEADER_PID} | tail -n 1 | tr -d ' ')
-    # PROC_GROUP_ID="$(ps -o pid,pgid | grep -E '^\s+${GROUP_LEADER_PID}\s+' | sed -E 's/\s*(\S+)\s*/\1\t/g' | cut -f 2 | tr -d '\t ')"
 
-    # install trap; make SIGINT and SIGTERM send SIGTERM to all children
-    # trap "kill -- -${PROC_GROUP_ID}; wait ${GROUP_LEADER_PID}; trap ' ' SIGINT SIGTERM" SIGINT SIGTERM
-    # trap "kill -- -${PROC_GROUP_ID}; wait ${GROUP_LEADER_PID}; kill ${LOGGER_PID}; wait; trap ' ' SIGINT SIGTERM" SIGINT SIGTERM
+    # install trap
+    #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
+    #   - keeps tee running; will exit on broken pipe
+    #   - keeps svlogd running; will be terminated after succesfull wait on group leader (below)
     trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID};" SIGINT SIGTERM
-    # trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID}; wait" SIGINT SIGTERM
 
-    # wait for command to finish (keep process running and forward signals)
+    # wait for command to finish
     wait ${GROUP_LEADER_PID}
+
+    # terminate remaining background commands (svlogd)
     jobs > /dev/null; jobs -p | xargs -i kill {}
     wait
     exit $?
-
-
-    # trap ' ' SIGINT SIGTERM
-    # ( ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${*} & ) | svlogd -tt ${__FISSION_LOGDIR}/app &    
-    # wait
-
-    # ( ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${*} & ) | svlogd -tt ${__FISSION_LOGDIR}/app
 }
 
 ### MAIN
