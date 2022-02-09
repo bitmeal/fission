@@ -2,6 +2,6 @@
     "stderr": false,
     "silent": true,
     "services": {
-        "01_srv": "echo [stdout] 01_srv; echo [stderr] 01_srv >&2; while true; do sleep 1; done"
+        "01_srv": "/testbin/printer.js 01_srv"
     }
 }

@@ -20,7 +20,7 @@ __FISSION_STDERR_TARGET="/proc/1/fd/2"
 
 ### MULTICALL SCRIPT
 # -> see end of file
-__FISSION_MULTICALL_ALIASES="fission-spawn fission-run"
+__FISSION_MULTICALL_ALIASES="fission-spawn fission-run fission-runsv fission-auxmain fission-getconf"
 
 
 ### helpers/methods
@@ -82,7 +82,22 @@ common_config()
 }
 
 
-### STEP 1
+### MULTICALL FUNCTIONS
+
+## get config as json string
+get_conf()
+{
+    LC_COLLATE=C
+    __FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
+
+    ### fetch fission config
+    # build config from overlays
+    # jq -rs 'reduce .[] as $item ({}; . * $item) | with_entries(.value = (.value | with_entries(select( .value != null ))))' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
+    # pre jq 1.6 compatible
+    jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
+}
+
+## INIT STEP 1
 # check usage
 # build/get config
 # replace pid1
@@ -132,7 +147,8 @@ setup_init() #${@}
     # build config from overlays
     # jq -rs 'reduce .[] as $item ({}; . * $item) | with_entries(.value = (.value | with_entries(select( .value != null ))))' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
     # pre jq 1.6 compatible
-    export FISSION_CONFIG=$(jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS})
+    # export FISSION_CONFIG=$(jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS})
+    export FISSION_CONFIG="$(${FISSION_SHELL} ${FISSION_PATH}/fission-getconf)"
 
     # setup common configuration variables
     common_config
@@ -150,13 +166,13 @@ setup_init() #${@}
     ### replace PID1
     if [ $$ -eq 1 ]; then
         log "spawning fpco/pid1 as PID1..."
-        exec pid1 $(which fission-spawn) ${@}
+        exec pid1 ${FISSION_PATH}/fission-spawn ${@}
     fi
     # TODO: allow fpco/pid1 SIGKILL timeout configuration
 }
 
 
-### STEP 2
+## INIT STEP 2
 # respawn with shell from /etc/passwd
 select_shell()
 {
@@ -167,12 +183,12 @@ select_shell()
     if [ -z ${FISSION_SHELL} ]; then
         export FISSION_SHELL=$(getent passwd $(whoami) | cut -d ':' -f 7)
         log "replacing /bin/sh as executor with ${FISSION_SHELL}..."
-        exec ${FISSION_SHELL} $(which fission-run) ${@}
+        exec ${FISSION_SHELL} ${FISSION_PATH}/fission-run ${@}
     fi
 }
 
 
-### STEP 3
+## INIT STEP 3
 # setup environment
 # run init scripts
 # start services
@@ -234,7 +250,7 @@ run()
         log "- ${__FISSION_SERVICE}"
         # get service command line without trailing semicollon (";")
         __FISSION_SERVICE_CMDL=$(echo "${FISSION_CONFIG}" | jq -r ".services.\"${__FISSION_SERVICE}\"")
-        __FISSION_SERVICE_CMDL="$(echo ${__FISSION_SERVICE_CMDL} | sed 's/;[[:space:]]*$//')"
+        # __FISSION_SERVICE_CMDL="$(echo ${__FISSION_SERVICE_CMDL} | sed 's/;[[:space:]]*$//')"
         log_verbose '`-: '"${__FISSION_SERVICE_CMDL}"
 
         mkdir -p "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log"
@@ -242,7 +258,8 @@ run()
         # (re)create service file
         echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
         # write service file with requested stderr logging mode
-        cmdl_redirect_print ${__FISSION_SERVICE_CMDL} >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
+        # cmdl_redirect_print ${__FISSION_SERVICE_CMDL} >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
+        echo "exec ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${__FISSION_SERVICE_CMDL}" >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
         chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
 
         # (re)create logger
@@ -274,12 +291,15 @@ run()
         mkdir -p "${__FISSION_LOGDIR}/app"
         # run primary command in background
         log "running main process in background [logging to ${__FISSION_LOGDIR}/app]..."
-        ( setsid "${FISSION_SHELL}" -c "$(cmdl_redirect_print ${__FISSION_PRIMARY})" | svlogd -tt ${__FISSION_LOGDIR}/app & )
+        # ( setsid "${FISSION_SHELL}" -c "$(cmdl_redirect_print ${__FISSION_PRIMARY})" | svlogd -tt ${__FISSION_LOGDIR}/app & )
+        # ( setsid ${FISSION_SHELL} -c "( ${FISSION_PATH}/fission-runsv ${__FISSION_PRIMARY} & ) | svlogd -tt ${__FISSION_LOGDIR}/app & wait" & )
+        ( setsid ${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain ${__FISSION_PRIMARY} & )
 
         shift
     else
         # run primary command in foreground and replace process
         log "starting main process..."
+        # TODO: remove shell call
         exec "${FISSION_SHELL}" -c "${__FISSION_PRIMARY}"
     fi
 
@@ -298,11 +318,104 @@ run()
     exec "${FISSION_SHELL}" -c "${__FISSION_AUXILLIARY}"
 }
 
+## run command and handle stderr redirection
+# TODO: remove additional shell call
+cmd_redirect_stderr()
+{
+    common_config
+    
+    # redirect fd 127 to stdout
+    exec 127>&1
 
+    if ${__FISSION_STDERR}; then
+        # run command:
+        #   in new backgrounded shell
+        #   shell as new process group leader
+        # allows signal forwarding as this process and handlers/traps stay active
+        # allows to forwarding signals to all child processes (including tee) by group
+        setsid ${FISSION_SHELL} -c "${*} 2>&1 1>&127 | setsid tee ${__FISSION_STDERR_TARGET}" &
+    else
+        setsid ${FISSION_SHELL} -c "${*}" 2>&1 &
+    fi
+
+    # get group id
+    GROUP_LEADER_PID=$!
+    PROC_GROUP_ID=$(ps -o pgid -p ${GROUP_LEADER_PID} | tail -n 1 | tr -d ' ')
+    # PROC_GROUP_ID="$(ps -o pid,pgid | grep -E '^\s+${GROUP_LEADER_PID}\s+' | sed -E 's/\s*(\S+)\s*/\1\t/g' | cut -f 2 | tr -d '\t ')"
+
+    # install trap; make SIGINT and SIGTERM send SIGTERM to all children
+    trap "kill -- -${PROC_GROUP_ID}" SIGINT SIGTERM
+    # trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID}; wait; exit" SIGINT SIGTERM
+
+    # wait for command to finish (keep process running and forward signals)
+    wait
+    exit $?
+}
+
+## run main command and handle stderr redirection in presence of auxilliary command
+main_redirect_stderr()
+{
+    common_config
+
+    # create FIFO to be used as "anonymous pipe"
+    # attach to file descriptor
+    # remove fifo link as cleanup step
+    # file descriptor will stay open as long as the shell
+    #------------------------------------------------------
+    PIPE=$(mktemp -u fifo.XXXXXX)
+    mkfifo ${PIPE}
+    exec 127<>${PIPE}
+    rm ${PIPE}
+    #------------------------------------------------------
+    
+    # attach logger
+    setsid svlogd -tt ${__FISSION_LOGDIR}/app <&127 &
+    # LOGGER_PID=$!
+
+    if ${__FISSION_STDERR}; then
+        # run command:
+        #   in new backgrounded shell
+        #   shell as new process group leader
+        # allows signal forwarding as this process and handlers/traps stay active
+        # allows to forwarding signals to all child processes (including tee) by group
+        setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; ${*} 2>&1 1>&127 | setsid tee ${__FISSION_STDERR_TARGET} 1>&127" &
+    else
+        setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; ${*} 1>&127 2>&127" &
+    fi
+
+    # get group id
+    GROUP_LEADER_PID=$!
+    PROC_GROUP_ID=$(ps -o pgid -p ${GROUP_LEADER_PID} | tail -n 1 | tr -d ' ')
+    # PROC_GROUP_ID="$(ps -o pid,pgid | grep -E '^\s+${GROUP_LEADER_PID}\s+' | sed -E 's/\s*(\S+)\s*/\1\t/g' | cut -f 2 | tr -d '\t ')"
+
+    # install trap; make SIGINT and SIGTERM send SIGTERM to all children
+    # trap "kill -- -${PROC_GROUP_ID}; wait ${GROUP_LEADER_PID}; trap ' ' SIGINT SIGTERM" SIGINT SIGTERM
+    # trap "kill -- -${PROC_GROUP_ID}; wait ${GROUP_LEADER_PID}; kill ${LOGGER_PID}; wait; trap ' ' SIGINT SIGTERM" SIGINT SIGTERM
+    trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID};" SIGINT SIGTERM
+    # trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID}; wait" SIGINT SIGTERM
+
+    # wait for command to finish (keep process running and forward signals)
+    wait ${GROUP_LEADER_PID}
+    jobs > /dev/null; jobs -p | xargs -i kill {}
+    wait
+    exit $?
+
+
+    # trap ' ' SIGINT SIGTERM
+    # ( ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${*} & ) | svlogd -tt ${__FISSION_LOGDIR}/app &    
+    # wait
+
+    # ( ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${*} & ) | svlogd -tt ${__FISSION_LOGDIR}/app
+}
+
+### MAIN
 ### multicall selector
 case "${FISSION_CALL}" in
     "fission")          setup_init ${@} ;;
     "fission-spawn")    select_shell ${@} ;;
     "fission-run")      run ${@} ;;
+    "fission-runsv")    cmd_redirect_stderr ${@} ;;
+    "fission-auxmain")  main_redirect_stderr ${@} ;;
+    "fission-getconf")  get_conf ${@} ;;
     *)                  echo "fission called as unknown command" >&2; exit 1;;
 esac

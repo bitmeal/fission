@@ -7,18 +7,25 @@ setup() {
     _common_setup
 }
 
-@test "services: stderr forwarding [ON]" {
+@test "services: stderr forwarding [ON] - empty stdout" {
 
-    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json ${IMAGE} sleep 2
+    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
     assert_success
     
     refute_output
-    assert_equal "${stderr}" "[stderr] 01_srv"
+}
+
+@test "services: stderr forwarding [ON] - msg on stderr" {
+
+    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
+    assert_success
+    
+    assert_line "[stderr] 01_srv"
 }
 
 @test "services: stderr forwarding [OFF]" {
 
-    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json ${IMAGE} sleep 2
+    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
     assert_success
     
     refute_output

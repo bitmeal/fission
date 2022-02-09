@@ -1,0 +1,7 @@
+{
+    "silent": true,
+    "services": {
+        "01_srv": "/testbin/signals.sh 01_srv",
+        "02_srv": "/testbin/signals.sh 02_srv"
+    }
+}

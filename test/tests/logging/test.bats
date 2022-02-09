@@ -12,7 +12,7 @@ setup() {
     # test log for messages from both streams:
     #   - prefixed with timestamp
     #   - prefixed by stream name
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} 'sleep 5; cat /var/log/*/current;'
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} 'sleep 5; cat /var/log/*/current;'
     assert_success
 
     # test timestamping

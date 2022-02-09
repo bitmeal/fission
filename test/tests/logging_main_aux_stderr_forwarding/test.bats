@@ -8,7 +8,7 @@ setup() {
 }
 
 @test "aux process: main stderr forwarding [ON]" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json ${IMAGE} 'echo fission-init >&2' -- sleep 1
+    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/echo_stderr.sh:/testbin/echo_stderr.sh ${IMAGE} /testbin/echo_stderr.sh -- sleep 1
     assert_success
     
     refute_output
@@ -16,7 +16,7 @@ setup() {
 }
 
 @test "aux process: main stderr forwarding [OFF]" {
-    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json ${IMAGE} 'echo fission-init >&2' -- sleep 1
+    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json  -v ${CTX}/echo_stderr.sh:/testbin/echo_stderr.sh ${IMAGE} /testbin/echo_stderr.sh -- sleep 1
     assert_success
     
     refute_output
