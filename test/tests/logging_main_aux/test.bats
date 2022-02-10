@@ -15,9 +15,10 @@ setup() {
 }
 
 @test "aux process: main process redirected to logfile (output in logfile)" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} echo fission-init -- "sleep 1; cat /var/log/app/current"
+    # calling sh -c needs cheating with "'cmd'"
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} echo fission-init -- sh -c "'sleep 1; cat /var/log/app/current'"
     assert_success
     
-    assert_line --index 0 --regexp '^[^[:blank:]]+ fission-init$'
+    assert_line --index 0 --partial 'fission-init'
     assert_equal "${stderr}" ""
 }

@@ -8,7 +8,8 @@ setup() {
 }
 
 @test "services: run services" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/touch.js:/testbin/touch.js ${IMAGE} "sleep 5; ls -l /testout"
+    # calling sh -c needs cheating with "'cmd'"
+    run --separate-stderr -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/touch.js:/testbin/touch.js ${IMAGE} sh -c "'sleep 5; ls -l /testout'"
     assert_success
     
     assert_line --partial '01_srv'

@@ -9,7 +9,8 @@ setup() {
 
 @test "aux process: run and stop container on exit" {
     # aux process outputs to stdout and container stops after aux process exits
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} true -- "sleep 1; echo fission-init"
+    # calling sh -c needs cheating with "'cmd'"
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} true -- sh -c "'sleep 1; echo fission-init'"
 	assert_success
 
     assert_equal "${output}" "fission-init"

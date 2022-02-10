@@ -27,12 +27,26 @@ RUN \
     tar -xzpf pid1.tar.gz && \
     chmod +x sbin/pid1
 
+WORKDIR /dumb-init
+ARG DUMB_INIT_VER=tags/v1.2.5
+RUN \
+    curl -L $(curl -L https://api.github.com/repos/Yelp/dumb-init/releases/${DUMB_INIT_VER} | jq -r '.assets[] | select(.name | match(".*x86_64")) | .browser_download_url') > dumb-init && \
+    chmod +x dumb-init
+
+WORKDIR /tini
+ARG TINI_VER=tags/v0.19.0
+RUN \
+    curl -L $(curl -L https://api.github.com/repos/krallin/tini/releases/${TINI_VER} | jq -r '.assets[] | select(.name | match("^tini-static-muslc-amd64$")) | .browser_download_url') > tini && \
+    chmod +x tini
+
 WORKDIR /opt/fission/bin
 ADD fission .
 RUN \
     chmod +x fission && \
     cp /jq/jq . && \
     cp /pid1/sbin/pid1 . && \
+    cp /dumb-init/dumb-init . && \
+    cp /tini/tini . && \
     cp /runit/admin/runit-${RUNIT_VER}/command/* .
 
 WORKDIR /

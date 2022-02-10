@@ -6,7 +6,11 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
 **fission init** simplifies the process of setting up your environment, running init scripts, supervising services with automatic logging and allows for simple introspection. All by means of a simple json file.
 
 ### Requirements
-* A POSIX compatible shell
+* A mainly POSIX compatible shell, with
+  * `sed`
+  * `cut`
+  * `tail`
+  * `xargs`
 * `fpco/pid1` as PID1
 * `runit` for service supervision
 * `jq`
@@ -132,6 +136,12 @@ As seen in the service section, forwarding of stderr of background services can 
     "stderr": false
 }
 ```
+
+## tests
+find tests and documentation in `./test`. Tests use *bats* for testing, but are "self-bootstrapping". Tests require:
+* docker
+* bash
+* `uuidgen` or `/proc/sys/kernel/random/uuid`
 
 ## notes 📜
 

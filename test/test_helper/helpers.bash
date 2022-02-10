@@ -38,3 +38,16 @@ print() {
 yq() {
   docker run --rm -i -v "${PWD}":/workdir mikefarah/yq "$@"
 }
+
+mkuuid() {
+    if which uuidgen >/dev/null; then
+        echo $(uuidgen)
+    else
+        if [ -e /proc/sys/kernel/random/uuid ]; then
+            echo $(cat /proc/sys/kernel/random/uuid)
+        else
+            print "could not generate uuid"
+            exit 1
+        fi
+    fi
+}
