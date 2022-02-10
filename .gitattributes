@@ -3,3 +3,4 @@
 *.bash text eol=lf
 *.bats text eol=lf
 *.js text eol=lf
+fission text eol=lf

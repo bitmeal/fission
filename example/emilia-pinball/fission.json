@@ -1,0 +1,15 @@
+{
+    "silent": false,
+    "stderr": false,
+
+    "env": {
+        "DISPLAY": ":0"
+    },
+
+    "services": {
+        "xvfb": "Xvfb ${DISPLAY}",
+        "vnc": "x11vnc -display ${DISPLAY} -forever",
+        "novnc": "/usr/share/novnc/utils/launch.sh --listen 8080",
+        "blackbox": "blackbox -display ${DISPLAY}"
+    }
+}

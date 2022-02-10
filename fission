@@ -33,14 +33,14 @@ log_multicall()
 log()
 {
     if ! ${__FISSION_SILENT}; then
-        printf "$@\n" | sed 's/^/> /g'
+        printf "%s\n" "$@" | sed 's/^/> /g'
     fi
 }
 
 log_verbose()
 {
     if ${FISSION_VERBOSE}; then
-        printf "$@\n" | sed 's/^/# /g'
+        printf "%s\n" "$@" | sed 's/^/# /g'
     fi
 }
 
@@ -94,11 +94,11 @@ setup_init() #${@}
     # check arguments
     __FISSION_USAGE="usage: fission command [options] [-- command2 [options]]"
     if [ ${#} -eq 0 ]; then
-        printf "${__FISSION_USAGE}\n"
+        printf "%s\n" "${__FISSION_USAGE}"
         exit 1
     fi
     if [ "${1}" = "--" ]; then
-        printf "${__FISSION_USAGE}\n"
+        printf "%s\n" "${__FISSION_USAGE}"
         exit 1
     fi
 
@@ -112,7 +112,7 @@ setup_init() #${@}
 
     # check fission.json exists
     if [ ! -f "${__FISSION_FILE}" ] ; then
-        printf "configuration file ${__FISSION_FILE} missing\n"
+        printf "configuration file %s missing\n" ${__FISSION_FILE}
         exit 1
     fi
 
@@ -121,11 +121,11 @@ setup_init() #${@}
     __FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
     for __FISSION_CONFIG_FILE in ${__FISSION_FILE} ${__FISSION_OVERLAYS}; do
         if ! jq '.' "${__FISSION_CONFIG_FILE}" > /dev/null; then
-            printf "cannot parse ${__FISSION_CONFIG_FILE}; review jq error output above\n"
+            printf "cannot parse %s; review jq error output above\n" ${__FISSION_CONFIG_FILE}
             exit 1
         fi
         if [ "$(jq -r 'type' ${__FISSION_CONFIG_FILE})" != "object" ]; then
-            printf "configuration file ${__FISSION_CONFIG_FILE} is not an object\n"
+            printf "configuration file %s is not an object\n" ${__FISSION_CONFIG_FILE}
             exit 1
         fi
     done
@@ -259,6 +259,25 @@ run()
     log "starting services..."
     # ( setsid ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
     ( ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
+
+    # wait to start runsvdir
+    # TODO: find better solution
+    sleep 1
+
+    # wait for services
+    log "waiting for services..."
+    for __FISSION_SERVICE in ${__FISSION_RUNSVDIR}/**; do
+        # wait 30 seconds for service to come up
+        sv -w 30 check ${__FISSION_SERVICE} >/dev/null
+
+        if [ $? -ne 0 ]; then
+            log "service $(basename ${__FISSION_SERVICE}) not starting up! exiting"
+            exit 1
+        fi
+
+        log_verbose "service $(basename ${__FISSION_SERVICE}) up"
+    done
+
 
     ### exec
     # build primary command till '--' or end of options

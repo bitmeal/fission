@@ -25,6 +25,19 @@ Partial compatibility with existing schemes for environment initialization and `
 > 2. *Runit*, as well as being the core component of **fission init** for service supervision, is the name of an island. *Runit* island is a nuclear waste storage site and nuclear *fission* bomb testing site.
 
 ## quickstart
+```dockerfile
+# Dockerfile
+FROM <your-base>
+
+# get fission-init
+COPY --from=ghcr.io/bitmeal/fission:latest / /
+
+#...
+
+# use fission-init
+ENTRYPOINT ["/opt/fission/bin/fission", "/opt/app/app", "app_param_mandatory"]
+CMD ["app_param_optional"]
+```
 ```json
 // fission.json [/etc/fission/fission.json]
 {
@@ -41,18 +54,17 @@ Partial compatibility with existing schemes for environment initialization and `
 ```
 * copy rootfs (`/`) from `fission:base` container image
 * configure your environment, init scripts and services in `fission.json`
-* copy your `fission.json` configuration as `/etc/fission/fission.json` in your container
+* add your `fission.json` configuration as `/etc/fission/fission.json` in your container
 * call `fission`, and give your main command and its parameters as arguments, as `ENTRYPOINT`
-```dockerfile
-# Dockerfile
 
-FROM <your-base>
-COPY --from=fission:base / /
+> **see `examples/` for full examples of using *fission-init***
+### docker images
+As seen above, you can copy all required files form the provided docker image `ghcr.io/bitmeal/fission`. *Check `test/platforms/<platform>/Dockerfile` to see if your platform requires additional dependencies.*
 
-ENTRYPOINT ["/opt/fission/bin/fission", "/opt/app/app", "app_param_mandatory"]
-CMD ["app_param_optional"]
-```
-
+Available tags to pull:
+* `latest`: latest tagged version
+* `v<version>`: specific tagged version
+* `edge`: latest commit on master
 ### manual setup
 
 * copy `fission` to a destination of your choice within your container
@@ -154,6 +166,5 @@ find tests and documentation in `./test`. Tests use *bats* for testing, but are 
 ---
 ## TODO
 * service signal forwarding tests
-* update docker image names in README
 
 
