@@ -298,16 +298,6 @@ run()
     done
     log_verbose "aux cmdl: ${__FISSION_AUXILLIARY}"
     
-    # # redirect all file descriptors to /dev/null
-    # log_verbose "redirecting all file descriptors of active shell to /dev/null"
-    # for fd in $(ls /proc/$$/fd | tail -n +2); do
-    #     # eval "exec ${fd}>&-"
-    #     eval "exec ${fd}>/dev/null"
-    # done
-    # exec </dev/null
-
-    # # install trap to forward signals to main and aux process
-    # trap "jobs >/dev/null; jobs -p | xargs -i kill {}; wait" SIGINT SIGTERM
 
     # install trap to ignore signals from init:
     # all subprocesses should receive a sigint individually
@@ -315,13 +305,8 @@ run()
 
     # run aux process
     log "starting aux process..."
-    # log_verbose "attaching aux process file descriptors 0,1,2 to /proc/1/fd/<n>" >/proc/1/fd/1
     
     eval "${__FISSION_AUXILLIARY}"
-        # </proc/1/fd/0 >/proc/1/fd/1 2>/proc/1/fd/2
-    # # wait for aux command to terminate
-    # AUX_COMMAND_PID=$!
-    # wait ${AUX_COMMAND_PID}
     
     # # send sigterm and/or wait for main process
     log "auxilliary command exited sending SIGTERM to main..."
@@ -338,7 +323,7 @@ run()
 # -> allows to forwarding signals to all child processes (including tee) by group
 
 ## run command and handle stderr redirection
-# TODO: remove additional shell call
+# TODO: remove additional shell call?
 cmd_redirect_stderr()
 {
     common_config
@@ -355,8 +340,6 @@ cmd_redirect_stderr()
     # get group id
     GROUP_LEADER_PID=$!
     PROC_GROUP_ID=$(cat /proc/${GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
-    # PROC_GROUP_ID=$(ps -o pgid -p ${GROUP_LEADER_PID} | tail -n 1 | tr -d ' ')
-    # PROC_GROUP_ID="$(ps -o pid,pgid | grep -E '^\s+${GROUP_LEADER_PID}\s+' | sed -E 's/\s*(\S+)\s*/\1\t/g' | cut -f 2 | tr -d '\t ')"
 
     # install trap
     #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
@@ -400,7 +383,6 @@ main_logger()
     # get group id
     GROUP_LEADER_PID=$!
     PROC_GROUP_ID=$(cat /proc/${GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
-    # PROC_GROUP_ID=$(ps -o pgid -p ${GROUP_LEADER_PID} | tail -n 1 | tr -d ' ')
 
     log_verbose "main process running in background with pgroup id ${PROC_GROUP_ID}"
 
