@@ -1,0 +1,27 @@
+name: Run Tests
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [alpine, centos, debian, opensuse, ubuntu]
+    steps:
+    - 
+      name: Clone
+      uses: actions/checkout@v2
+    -
+      name: Run Tests
+      working-directory: test
+      env:
+        FISSION_PLATFORM: ${{ matrix.platform }}
+      run: ./test.bash -t
+
+
+

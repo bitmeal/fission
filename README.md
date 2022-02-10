@@ -154,10 +154,6 @@ find tests and documentation in `./test`. Tests use *bats* for testing, but are 
 ---
 ## TODO
 * service signal forwarding tests
-* clean docker image
-* ci
-  * testing
-  * release docker image on tag
 * update docker image names in README
 
 

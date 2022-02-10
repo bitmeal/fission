@@ -20,18 +20,18 @@ RUN \
     curl -L $(curl -L https://api.github.com/repos/stedolan/jq/releases/${JQ_VER} | jq -r '.assets[] | select(.name | match(".*linux.*64")) | .browser_download_url') > jq && \
     chmod +x jq
 
-WORKDIR /pid1
-ARG PID1_VER=tags/pid1-0.1.3.0
-RUN \
-    curl -L $(curl -L https://api.github.com/repos/fpco/pid1/releases/${PID1_VER} | jq -r '.assets[] | select(.name | match(".*linux.*64")) | .browser_download_url') > pid1.tar.gz && \
-    tar -xzpf pid1.tar.gz && \
-    chmod +x sbin/pid1
+# WORKDIR /pid1
+# ARG PID1_VER=tags/pid1-0.1.3.0
+# RUN \
+#     curl -L $(curl -L https://api.github.com/repos/fpco/pid1/releases/${PID1_VER} | jq -r '.assets[] | select(.name | match(".*linux.*64")) | .browser_download_url') > pid1.tar.gz && \
+#     tar -xzpf pid1.tar.gz && \
+#     chmod +x sbin/pid1
 
-WORKDIR /dumb-init
-ARG DUMB_INIT_VER=tags/v1.2.5
-RUN \
-    curl -L $(curl -L https://api.github.com/repos/Yelp/dumb-init/releases/${DUMB_INIT_VER} | jq -r '.assets[] | select(.name | match(".*x86_64")) | .browser_download_url') > dumb-init && \
-    chmod +x dumb-init
+# WORKDIR /dumb-init
+# ARG DUMB_INIT_VER=tags/v1.2.5
+# RUN \
+#     curl -L $(curl -L https://api.github.com/repos/Yelp/dumb-init/releases/${DUMB_INIT_VER} | jq -r '.assets[] | select(.name | match(".*x86_64")) | .browser_download_url') > dumb-init && \
+#     chmod +x dumb-init
 
 WORKDIR /tini
 ARG TINI_VER=tags/v0.19.0
@@ -44,8 +44,8 @@ ADD fission .
 RUN \
     chmod +x fission && \
     cp /jq/jq . && \
-    cp /pid1/sbin/pid1 . && \
-    cp /dumb-init/dumb-init . && \
+    # cp /pid1/sbin/pid1 . && \
+    # cp /dumb-init/dumb-init . && \
     cp /tini/tini . && \
     cp /runit/admin/runit-${RUNIT_VER}/command/* .
 

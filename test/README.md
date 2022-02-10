@@ -17,12 +17,14 @@ requirements:
 ### containers
 to emulate services and applications, a nodejs runtime will be used
 
-for debugging and introspection purposes and to successfully run test, all testing containers shall include:
+to successfully run test, all testing containers shall include:
 * nodejs + npm + chalk package
-* pstree
-* nano
-* htop
-* tmux
+
+~~for debugging and introspection purposes, add:~~
+* ~~pstree~~
+* ~~nano~~
+* ~~htop~~
+* ~~tmux~~
 
 recommendation is to install `procps` and `psmisc`
 
