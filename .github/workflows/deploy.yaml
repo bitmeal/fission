@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    uses: bitmeal/fission/.github/workflows/test.yml@main
+    uses: ./.github/workflows/test.yaml
 
   prepare:
     needs:
