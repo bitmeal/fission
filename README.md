@@ -151,4 +151,13 @@ find tests and documentation in `./test`. Tests use *bats* for testing, but are 
 * bash
 * `uuidgen` or `/proc/sys/kernel/random/uuid`
 
+---
+## TODO
+* service signal forwarding tests
+* clean docker image
+* ci
+  * testing
+  * release docker image on tag
+* update docker image names in README
+
 
