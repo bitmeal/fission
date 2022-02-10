@@ -12,7 +12,8 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
   * `tail`
   * `xargs`
 * `tini` as PID1
-* `runit` for service supervision
+* `runsvdir`(`runit`) for service supervision
+* `dumb-init` for signal rewriting to `runsvdir`
 * `jq`
 
 > **POSIX** compatibility is **no** design goal! This project is targeting Linux containers.
@@ -68,7 +69,7 @@ Available tags to pull:
 ### manual setup
 
 * copy `fission` to a destination of your choice within your container
-* install `tini`, `runit` and `jq`
+* install `tini`, `dumb-init`, `runit` and `jq`
 
 ## features
 ### PID1
@@ -104,6 +105,7 @@ Service supervision is provided by `runit` and its `runsvdir`. Configure your se
     }
 }
 ```
+In addition to `tini`, `dumb-init` is used to rewrite `SIGTERM/SIGINT` to `SIGHUP` for `runsvdir` and use its signal forwarding capabilities to services.
 Manually created `runit` services from `/etc/service` will be launched, but will not profit from any automated functionality of **fission init**!
 #### automatic logging
 A logger will be created for all services configured in your `fission.json`. *stdout* and *stderr* are merged and logged in `/var/log/<service_name>/`, using `svlogd` with automatic log rotation.

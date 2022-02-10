@@ -59,11 +59,9 @@ setup() {
     ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) &
     # run test container
     run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js --name ${CONTAINER_ID} ${IMAGE} /testbin/signals.js main -- /testbin/signals.js aux
+    # assert_success
     
-
-    assert_success
-    
-    assert_line --partial '[stdout] [SIGTERM] aux'
+    assert_output --partial '[stdout] [SIGTERM] aux'
 
     # use stderr with bats_assert
     output=${stderr}
@@ -72,4 +70,18 @@ setup() {
     # fails with assert_line !?
     assert_output --partial '[stderr] [SIGTERM] main'
     assert_output --partial '[stderr] [SIGTERM] aux'
+}
+
+@test "signal forwarding: to services from docker kill -s SIGTERM; rewriting SIGTERM to SIGHUP for runsvdir" {
+    # trigger SIGTERM to main by exiting aux
+    CONTAINER_ID=$(mkuuid)
+    
+    # send SIGTERM in 10 seconds
+    ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) &
+    # run test container
+    run -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js -v ${CTX}/delaysigexit.js:/testbin/delaysigexit.js --name ${CONTAINER_ID} ${IMAGE} /testbin/delaysigexit.js 1000
+    assert_success
+    
+    assert_output --partial '[stderr] [SIGTERM] 01_srv'
+
 }
