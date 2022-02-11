@@ -407,13 +407,14 @@ runsv_redirect()
     setsid ${FISSION_SHELL} -c "${__SV_CMDLINE}" &
 
     # get group id
-    __GROUP_LEADER_PID=$!
-    __PROC_GROUP_ID=$(cat /proc/${__GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
+	__PROC_GROUP_LEADER_PID=$!
+	__PROC_GROUP_ID=$(cat /proc/${__PROC_GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
+	__PROC_GROUP_CHILD_PIDS="$(ps -e -o pgid,pid | awk -v pgid=${__PROC_GROUP_ID} '$1 == pgid {print $2}' | tr '\n' ' ')"
 
     # install trap
     #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
     #   - keeps tee running; will exit on broken pipe
-    trap "kill -- -${__PROC_GROUP_ID}; wait ${__GROUP_LEADER_PID} >/dev/null 2>/dev/null" SIGINT SIGTERM
+    trap "kill -- -${__PROC_GROUP_ID}; wait ${__PROC_GROUP_CHILD_PIDS} >/dev/null 2>/dev/null" SIGINT SIGTERM
 
     # wait for command to finish (keep process running and forward signals)
     wait >/dev/null 2>/dev/null
@@ -451,10 +452,11 @@ main_logger()
 	setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; ${__MAIN_CMDLINE}" &
 
 	# get group id
-	__GROUP_LEADER_PID=$!
-	__PROC_GROUP_ID=$(cat /proc/${__GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
+	__PROC_GROUP_LEADER_PID=$!
+	__PROC_GROUP_ID=$(cat /proc/${__PROC_GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
+	__PROC_GROUP_CHILD_PIDS="$(ps -e -o pgid,pid | awk -v pgid=${__PROC_GROUP_ID} '$1 == pgid {print $2}' | tr '\n' ' ')"
 
-	log_verbose "main process running in background with pgroup pid: ${__GROUP_LEADER_PID}; pgid:${__PROC_GROUP_ID}"
+	log_verbose "main process running in background shell with pid: ${__PROC_GROUP_LEADER_PID}; pgid:${__PROC_GROUP_ID}; child pids: ${__PROC_GROUP_CHILD_PIDS}"
 
 	# attach logger
 	read -r -d '' __LOGGER_CMDLINE <<-EOF
@@ -468,10 +470,10 @@ main_logger()
 	#   - make SIGINT and SIGTERM send SIGTERM to child pgroup
 	#   - keeps tee running; will exit on broken pipe
 	#   - keeps svlogd running; will be terminated after succesfull wait on group leader
-	trap "trap ' ' SIGINT SIGTERM; kill -- -${__PROC_GROUP_ID}; wait ${__GROUP_LEADER_PID} 2>/dev/null >/dev/null; jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null" SIGINT SIGTERM
+	trap "trap ' ' SIGINT SIGTERM; kill -- -${__PROC_GROUP_ID}; wait ${__PROC_GROUP_CHILD_PIDS} 2>/dev/null >/dev/null; jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null" SIGINT SIGTERM
 
 	# wait for command to finish
-	wait ${__GROUP_LEADER_PID} 2>/dev/null >/dev/null
+	wait ${__PROC_GROUP_LEADER_PID} 2>/dev/null >/dev/null
 	
 	# remove fifo and close file descriptor
 	rm ${__PIPE}
