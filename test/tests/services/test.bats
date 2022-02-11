@@ -15,7 +15,9 @@ setup() {
     assert_line --partial '01_srv'
     assert_line --partial '02_srv'
 
-    assert_equal "${stderr}" ""
+    swap_stdout_stderr
+
+    refute_output
 }
 
 @test "services: no runsvdir errors without services" {

@@ -28,46 +28,46 @@ __FISSION_MULTICALL_ALIASES="fission-spawn fission-run fission-runsv fission-aux
 ### helpers/methods
 log_multicall()
 {
-    log_verbose "called as ${FISSION_CALL}"
+	log_verbose "called as ${FISSION_CALL}"
 }
 
 log()
 {
-    if ! ${__FISSION_SILENT}; then
-        printf "%s\n" "$@" | sed 's/^/> /g'
-    fi
+	if ! ${__FISSION_SILENT}; then
+		printf "%s\n" "$@" | sed 's/^/> /g'
+	fi
 }
 
 log_verbose()
 {
-    if ${FISSION_VERBOSE}; then
-        printf "%s\n" "$@" | sed 's/^/# /g'
-    fi
+	if ${FISSION_VERBOSE}; then
+		printf "%s\n" "$@" | sed 's/^/# /g'
+	fi
 }
 
 common_config()
 {
-    # verbosity
-    if [ "${FISSION_VERBOSE}" = "" ]; then
-        FISSION_VERBOSE="false"
-    fi
+	# verbosity
+	if [ "${FISSION_VERBOSE}" = "" ]; then
+		FISSION_VERBOSE="false"
+	fi
 
-    # silent
-    __FISSION_SILENT=$(echo "${FISSION_CONFIG}" | jq '.silent // false')
-        # disable silence when verbose
-        if ${FISSION_VERBOSE}; then
-            __FISSION_SILENT="false"
-        fi
-        # redirect all command output on silence
-        if ${__FISSION_SILENT}; then
-            __FISSION_SILENT_REDIRECT=">/dev/null"
-        fi
+	# silent
+	__FISSION_SILENT=$(echo "${FISSION_CONFIG}" | jq '.silent // false')
+		# disable silence when verbose
+		if ${FISSION_VERBOSE}; then
+			__FISSION_SILENT="false"
+		fi
+		# redirect all command output on silence
+		if ${__FISSION_SILENT}; then
+			__FISSION_SILENT_REDIRECT=">/dev/null"
+		fi
 
 
-    # stderr forwarding
-    __FISSION_STDERR=$(echo "${FISSION_CONFIG}" | jq -e 'if has("stderr") then .stderr else true end')
+	# stderr forwarding
+	__FISSION_STDERR=$(echo "${FISSION_CONFIG}" | jq -e 'if has("stderr") then .stderr else true end')
 
-    log_multicall
+	log_multicall
 }
 
 
@@ -76,14 +76,14 @@ common_config()
 ## get config as json string
 get_conf()
 {
-    LC_COLLATE=C
-    __FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
+	LC_COLLATE=C
+	__FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
 
-    ### fetch fission config
-    # build config from overlays
-    # jq -rs 'reduce .[] as $item ({}; . * $item) | with_entries(.value = (.value | with_entries(select( .value != null ))))' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
-    # pre jq 1.6 compatible
-    jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
+	### fetch fission config
+	# build config from overlays
+	# jq -rs 'reduce .[] as $item ({}; . * $item) | with_entries(.value = (.value | with_entries(select( .value != null ))))' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
+	# pre jq 1.6 compatible
+	jq -rs 'reduce .[] as $item ({}; . * $item) | walk( if type == "object" then with_entries(select(.value != null)) else . end)' ${__FISSION_FILE} ${__FISSION_OVERLAYS}
 }
 
 ## INIT STEP 1
@@ -92,69 +92,69 @@ get_conf()
 # replace pid1
 setup_init() #${@}
 {
-    # check arguments
-    __FISSION_USAGE="usage: fission command [options] [-- command2 [options]]"
-    if [ ${#} -eq 0 ]; then
-        printf "%s\n" "${__FISSION_USAGE}"
-        exit 1
-    fi
-    if [ "${1}" = "--" ]; then
-        printf "%s\n" "${__FISSION_USAGE}"
-        exit 1
-    fi
+	# check arguments
+	__FISSION_USAGE="usage: fission command [options] [-- command2 [options]]"
+	if [ ${#} -eq 0 ]; then
+		printf "%s\n" "${__FISSION_USAGE}"
+		exit 1
+	fi
+	if [ "${1}" = "--" ]; then
+		printf "%s\n" "${__FISSION_USAGE}"
+		exit 1
+	fi
 
-    # link multicall aliases
-    for __FISSION_ALIAS in ${__FISSION_MULTICALL_ALIASES}; do
-        ln -s ${FISSION_BINARY} ${FISSION_PATH}/${__FISSION_ALIAS}
-    done
+	# link multicall aliases
+	for __FISSION_ALIAS in ${__FISSION_MULTICALL_ALIASES}; do
+		ln -s ${FISSION_BINARY} ${FISSION_PATH}/${__FISSION_ALIAS}
+	done
 
-    # update path to use local binaries
-    export PATH=${FISSION_PATH}:${PATH}
+	# update path to use local binaries
+	export PATH=${FISSION_PATH}:${PATH}
 
-    # check fission.json exists
-    if [ ! -f "${__FISSION_FILE}" ] ; then
-        printf "configuration file %s missing\n" ${__FISSION_FILE}
-        exit 1
-    fi
+	# check fission.json exists
+	if [ ! -f "${__FISSION_FILE}" ] ; then
+		printf "configuration file %s missing\n" ${__FISSION_FILE}
+		exit 1
+	fi
 
-    # test fission.json and overlays
-    LC_COLLATE=C
-    __FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
-    for __FISSION_CONFIG_FILE in ${__FISSION_FILE} ${__FISSION_OVERLAYS}; do
-        if ! jq '.' "${__FISSION_CONFIG_FILE}" > /dev/null; then
-            printf "cannot parse %s; review jq error output above\n" ${__FISSION_CONFIG_FILE}
-            exit 1
-        fi
-        if [ "$(jq -r 'type' ${__FISSION_CONFIG_FILE})" != "object" ]; then
-            printf "configuration file %s is not an object\n" ${__FISSION_CONFIG_FILE}
-            exit 1
-        fi
-    done
-
-
-    ### fetch fission config
-    export FISSION_CONFIG="$(${FISSION_SHELL} ${FISSION_PATH}/fission-getconf)"
-
-    # setup common configuration variables
-    common_config
-
-    ## logging
-    # postponed logging after config has been read to respect silence flag
-    log_verbose "silent: ${__FISSION_SILENT}"
-    log_verbose "stderr: ${__FISSION_STDERR}"
-    log_verbose "using config:"
-    log_verbose "$(echo ${FISSION_CONFIG} | jq -C .)"
-    log_verbose "created multicall aliases: ${__FISSION_MULTICALL_ALIASES}"
-    log "updating PATH as ${FISSION_PATH}:"'${PATH}'
+	# test fission.json and overlays
+	LC_COLLATE=C
+	__FISSION_OVERLAYS="$(if [ -d ${__FISSION_OVERLAY_DIR} ]; then echo ${__FISSION_OVERLAY_DIR}/*; fi)"
+	for __FISSION_CONFIG_FILE in ${__FISSION_FILE} ${__FISSION_OVERLAYS}; do
+		if ! jq '.' "${__FISSION_CONFIG_FILE}" > /dev/null; then
+			printf "cannot parse %s; review jq error output above\n" ${__FISSION_CONFIG_FILE}
+			exit 1
+		fi
+		if [ "$(jq -r 'type' ${__FISSION_CONFIG_FILE})" != "object" ]; then
+			printf "configuration file %s is not an object\n" ${__FISSION_CONFIG_FILE}
+			exit 1
+		fi
+	done
 
 
-    ### replace PID1
-    if [ $$ -eq 1 ]; then
-        log "spawning ${__FISSION_PID1_CMD} as PID1..."
-        exec ${__FISSION_PID1_CMD} ${FISSION_PATH}/fission-spawn ${@}
-    else
-        exec /usr/bin/env sh ${FISSION_PATH}/fission-spawn ${@}
-    fi
+	### fetch fission config
+	export FISSION_CONFIG="$(${FISSION_SHELL} ${FISSION_PATH}/fission-getconf)"
+
+	# setup common configuration variables
+	common_config
+
+	## logging
+	# postponed logging after config has been read to respect silence flag
+	log_verbose "silent: ${__FISSION_SILENT}"
+	log_verbose "stderr: ${__FISSION_STDERR}"
+	log_verbose "using config:"
+	log_verbose "$(echo ${FISSION_CONFIG} | jq -C .)"
+	log_verbose "created multicall aliases: ${__FISSION_MULTICALL_ALIASES}"
+	log "updating PATH as ${FISSION_PATH}:"'${PATH}'
+
+
+	### replace PID1
+	if [ $$ -eq 1 ]; then
+		log "spawning ${__FISSION_PID1_CMD} as PID1..."
+		exec ${__FISSION_PID1_CMD} ${FISSION_PATH}/fission-spawn ${@}
+	else
+		exec /usr/bin/env sh ${FISSION_PATH}/fission-spawn ${@}
+	fi
 }
 
 
@@ -162,16 +162,16 @@ setup_init() #${@}
 # respawn with shell from /etc/passwd
 select_shell()
 {
-    # setup common configuration variables
-    common_config
+	# setup common configuration variables
+	common_config
 
-    # respawn with shell from /etc/passwd
-    if [ -z ${FISSION_SHELL} ]; then
-        export FISSION_SHELL=$(getent passwd $(whoami) | cut -d ':' -f 7)
-        log "replacing /bin/sh as executor with ${FISSION_SHELL}..."
-    fi
+	# respawn with shell from /etc/passwd
+	if [ -z ${FISSION_SHELL} ]; then
+		export FISSION_SHELL=$(getent passwd $(whoami) | cut -d ':' -f 7)
+		log "replacing /bin/sh as executor with ${FISSION_SHELL}..."
+	fi
 
-    exec ${FISSION_SHELL} ${FISSION_PATH}/fission-run ${@}
+	exec ${FISSION_SHELL} ${FISSION_PATH}/fission-run ${@}
 }
 
 
@@ -182,154 +182,173 @@ select_shell()
 # run main & aux process(es)
 run()
 {
-    # setup common configuration variables
-    common_config
+	# setup common configuration variables
+	common_config
 
-    ### load env
-    # TODO: use jq @sh quoting?
-    log "loading env..."
-    for __FISSION_ENV_VAR in $(echo "${FISSION_CONFIG}" | jq -r '.env // empty | keys | .[]'); do
-        __FISSION_ENV_VAR_VAL=$(echo "${FISSION_CONFIG}" | jq -r ".env.\"${__FISSION_ENV_VAR}\"")
-        log "- ${__FISSION_ENV_VAR}"
-        log_verbose '`-: '"${__FISSION_ENV_VAR_VAL}"
-        export ${__FISSION_ENV_VAR}="${__FISSION_ENV_VAR_VAL}"
-        unset __FISSION_ENV_VAR_VAL
-    done
+	### load env
+	# TODO: use jq @sh quoting?
+	log "loading env..."
+	for __FISSION_ENV_VAR in $(echo "${FISSION_CONFIG}" | jq -r '.env // empty | keys | .[]'); do
+		__FISSION_ENV_VAR_VAL=$(echo "${FISSION_CONFIG}" | jq -r ".env.\"${__FISSION_ENV_VAR}\"")
+		log "- ${__FISSION_ENV_VAR}"
+		log_verbose '`-: '"${__FISSION_ENV_VAR_VAL}"
+		export ${__FISSION_ENV_VAR}="${__FISSION_ENV_VAR_VAL}"
+		unset __FISSION_ENV_VAR_VAL
+	done
 
-    ### source init scripts
-    log "running init tasks..."
-    for __FISSION_INIT in $(echo "${FISSION_CONFIG}" | jq -rS '.init // empty | keys | .[]'); do
-        __FISSION_INIT_TARGET=$(echo "${FISSION_CONFIG}" | jq -r ".init.\"${__FISSION_INIT}\"")
+	### source init scripts
+	log "running init tasks..."
+	for __FISSION_INIT in $(echo "${FISSION_CONFIG}" | jq -rS '.init // empty | keys | .[]'); do
+		__FISSION_INIT_TARGET=$(echo "${FISSION_CONFIG}" | jq -r ".init.\"${__FISSION_INIT}\"")
 
-        log_verbose "${__FISSION_INIT}"
-        log_verbose "${__FISSION_INIT_TARGET}"
+		log_verbose "${__FISSION_INIT}"
+		log_verbose "${__FISSION_INIT_TARGET}"
 
-        if [ -e ${__FISSION_INIT_TARGET} -o "${__FISSION_INIT_TARGET}" = "" ]; then
-            if [ -d ${__FISSION_INIT_TARGET} ]; then
-                # is directory
-                log "+ ${__FISSION_INIT_TARGET}"
-                for __FISSION_INIT_TARGET_SCRIPT in $(find -L ${__FISSION_INIT_TARGET} -type f -executable -name '*' | sort -f); do
-                    if [ -e "${__FISSION_INIT_TARGET_SCRIPT}" ] ; then
-                        log "|- ${__FISSION_INIT_TARGET_SCRIPT}"
-                        . "${__FISSION_INIT_TARGET_SCRIPT}" ${__FISSION_SILENT_REDIRECT}
-                    fi
-                done
-            else
-                # is file
-                log "- ${__FISSION_INIT_TARGET}"
-                . "${__FISSION_INIT_TARGET}" ${__FISSION_SILENT_REDIRECT}
-            fi
-        else
-            log "- [ERR] ${__FISSION_INIT_TARGET} does not exist!"
-        fi
+		if [ -e ${__FISSION_INIT_TARGET} -o "${__FISSION_INIT_TARGET}" = "" ]; then
+			if [ -d ${__FISSION_INIT_TARGET} ]; then
+				# is directory
+				log "+ ${__FISSION_INIT_TARGET}"
+				for __FISSION_INIT_TARGET_SCRIPT in $(find -L ${__FISSION_INIT_TARGET} -type f -executable -name '*' | sort -f); do
+					if [ -e "${__FISSION_INIT_TARGET_SCRIPT}" ] ; then
+						log "|- ${__FISSION_INIT_TARGET_SCRIPT}"
+						. "${__FISSION_INIT_TARGET_SCRIPT}" ${__FISSION_SILENT_REDIRECT}
+					fi
+				done
+			else
+				# is file
+				log "- ${__FISSION_INIT_TARGET}"
+				. "${__FISSION_INIT_TARGET}" ${__FISSION_SILENT_REDIRECT}
+			fi
+		else
+			log "- [ERR] ${__FISSION_INIT_TARGET} does not exist!"
+		fi
 
-        unset __FISSION_INIT_TARGET
-    done
-
-
-    ### create services & logging
-    # logging with stdout and stderr to file + stderr to screen
-    log "creating services..."
-    mkdir -p ${__FISSION_RUNSVDIR}
-    for __FISSION_SERVICE in $(echo "${FISSION_CONFIG}" | jq -r '.services // empty | keys | .[]'); do
-        # log "creating service: ${__FISSION_SERVICE}"
-        log "- ${__FISSION_SERVICE}"
-        __FISSION_SERVICE_CMDL=$(echo "${FISSION_CONFIG}" | jq -r ".services.\"${__FISSION_SERVICE}\"")
-        log_verbose '`-: '"${__FISSION_SERVICE_CMDL}"
-
-        mkdir -p "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log"
-
-        # (re)create service file
-        echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-        # write service file with requested stderr logging mode
-        echo "exec ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${__FISSION_SERVICE_CMDL}" >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-        chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
-
-        # (re)create logger
-        echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
-        echo "exec svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE}" >> "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
-        chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
-        mkdir -p "${__FISSION_LOGDIR}/${__FISSION_SERVICE}"
-
-        unset __FISSION_SERVICE_CMDL
-    done
+		unset __FISSION_INIT_TARGET
+	done
 
 
+	### create services & logging
+	# logging with stdout and stderr to file + stderr to screen
+	log "creating services..."
+	mkdir -p ${__FISSION_RUNSVDIR}
+	for __FISSION_SERVICE in $(echo "${FISSION_CONFIG}" | jq -r '.services // empty | keys | .[]'); do
+		# log "creating service: ${__FISSION_SERVICE}"
+		log "- ${__FISSION_SERVICE}"
+		__FISSION_SERVICE_CMDL=$(echo "${FISSION_CONFIG}" | jq -r ".services.\"${__FISSION_SERVICE}\"")
+		log_verbose '`-: '"${__FISSION_SERVICE_CMDL}"
 
-    ### run services
-    log "starting services..."
-    # ( setsid ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
-    ( ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
+		mkdir -p "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log"
 
-    # wait to start runsvdir
-    # TODO: find better solution
-    sleep 2
+		# (re)create service file
+		read -r -d '' __SV_SCRIPT <<-EOF
+			#!${FISSION_SHELL}
+			exec ${FISSION_SHELL} ${FISSION_PATH}/fission-runsv ${__FISSION_SERVICE_CMDL}
+		EOF
+		__SV_SCRIPT=${__SV_SCRIPT}
+		echo "${__SV_SCRIPT}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
+		chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
 
-    # wait for services
-    log "waiting for services..."
-    for __FISSION_SERVICE in $(ls ${__FISSION_RUNSVDIR}); do
-        # wait 30 seconds for service to come up
-        sv -w 30 check ${__FISSION_RUNSVDIR}/${__FISSION_SERVICE} >/dev/null
+		# (re)create logger
+		echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
+		read -r -d '' __SV_LOG_SCRIPT <<-EOF
+			#!${FISSION_SHELL}
+			# will be killed by broken pipes
+			trap ' ' SIGINT SIGTERM
+			svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE} 2>&1 | awk -v name="${__FISSION_SERVICE}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' > ${__FISSION_STDERR_TARGET}
+			EOF
+		__SV_LOG_SCRIPT=${__SV_LOG_SCRIPT}
+		echo "${__SV_LOG_SCRIPT}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
+		chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
+		
 
-        if [ $? -ne 0 ]; then
-            log "service ${__FISSION_SERVICE} not starting up! exiting"
-            exit 1
-        fi
+		mkdir -p "${__FISSION_LOGDIR}/${__FISSION_SERVICE}"
+		
+		# enable forwarding
+		if ${__FISSION_STDERR}; then
+			echo 'eE:*' > ${__FISSION_LOGDIR}/${__FISSION_SERVICE}/config
+		fi
 
-        log_verbose "service ${__FISSION_SERVICE} up"
-    done
-
-
-    ### exec
-    # build primary command till '--' or end of options
-    while [ ${#} -ne 0 ] && [ "${1}" != "--" ]; do
-        __FISSION_PRIMARY="${__FISSION_PRIMARY} ${1}"
-        shift
-    done
-    log_verbose "main cmdl: ${__FISSION_PRIMARY}"
-
-    # has an auxilliary command after -- ?
-    if [ "${1}" = "--" ] && [ ${#} -gt 1 ]; then
-        # create logging directory
-        mkdir -p "${__FISSION_LOGDIR}/app"
-        # run primary command in background
-        log "running main process in background [logging to ${__FISSION_LOGDIR}/app]..."        
-        ${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain ${__FISSION_PRIMARY} &
-
-        shift
-    else
-        # run primary command in foreground and replace process
-        log "starting main process..."
-        # TODO: remove shell call
-        eval "exec ${__FISSION_PRIMARY}"
-    fi
-
-    # -> process replaced here if no auxilliary command is given
-    # --
+		unset __FISSION_SERVICE_CMDL
+		unset __SV_SCRIPT
+		unset __SV_LOG_SCRIPT
+	done
 
 
-    # build auxilliary command
-    # __FISSION_AUXILLIARY=${@}
-    while [ ${#} -ne 0 ]; do
-        __FISSION_AUXILLIARY="${__FISSION_AUXILLIARY} ${1}"
-        shift
-    done
-    log_verbose "aux cmdl: ${__FISSION_AUXILLIARY}"
-    
 
-    # install trap to ignore signals from init:
-    # all subprocesses should receive a sigint individually
-    trap 'jobs >/dev/null; jobs -p | xargs -i kill {}; wait' SIGINT SIGTERM
+	### run services
+	log "starting services..."
+	# ( setsid ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
+	( ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
 
-    # run aux process
-    log "starting aux process..."
-    
-    eval "${__FISSION_AUXILLIARY}"
-    
-    # # send sigterm and/or wait for main process
-    log "auxilliary command exited sending SIGTERM to main..."
-    jobs >/dev/null; jobs -p | xargs -i kill {}
-    wait
+	# wait to start runsvdir
+	# TODO: find better solution
+	sleep 2
+
+	# wait for services
+	log "waiting for services..."
+	for __FISSION_SERVICE in $(ls ${__FISSION_RUNSVDIR}); do
+		# wait 30 seconds for service to come up
+		sv -w 30 check ${__FISSION_RUNSVDIR}/${__FISSION_SERVICE} >/dev/null
+
+		if [ $? -ne 0 ]; then
+			log "service ${__FISSION_SERVICE} not starting up! exiting"
+			exit 1
+		fi
+
+		log_verbose "service ${__FISSION_SERVICE} up"
+	done
+
+
+	### exec
+	# build primary command till '--' or end of options
+	while [ ${#} -ne 0 ] && [ "${1}" != "--" ]; do
+		__FISSION_PRIMARY="${__FISSION_PRIMARY} ${1}"
+		shift
+	done
+	log_verbose "main cmdl: ${__FISSION_PRIMARY}"
+
+	# has an auxilliary command after -- ?
+	if [ "${1}" = "--" ] && [ ${#} -gt 1 ]; then
+		# run primary command in background
+		log "running main process in background [logging to ${__FISSION_LOGDIR}/app]..."        
+		${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain ${__FISSION_PRIMARY} &
+
+		shift
+	else
+		# run primary command in foreground and replace process
+		log "starting main process..."
+		# TODO: remove shell call
+		eval "exec ${__FISSION_PRIMARY}"
+	fi
+
+	# -> process replaced here if no auxilliary command is given
+	# --
+
+
+	# build auxilliary command
+	# __FISSION_AUXILLIARY=${@}
+	while [ ${#} -ne 0 ]; do
+		__FISSION_AUXILLIARY="${__FISSION_AUXILLIARY} ${1}"
+		shift
+	done
+	log_verbose "aux cmdl: ${__FISSION_AUXILLIARY}"
+	
+
+	# install trap to ignore signals from init:
+	# all subprocesses should receive a sigint individually
+	trap 'jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null' SIGINT SIGTERM
+
+	# wait for main process (keep logging in order)
+	sleep 1
+	# run aux process
+	log "starting aux process..."
+	
+	eval "${__FISSION_AUXILLIARY}"
+	
+	# # send sigterm and/or wait for main process
+	log "auxilliary command exited sending SIGTERM to main..."
+	jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}
+	wait 2>/dev/null >/dev/null
 }
 
 
@@ -342,90 +361,99 @@ run()
 
 ## run command and handle stderr redirection
 # TODO: remove additional shell call?
-cmd_redirect_stderr()
+runsv_redirect()
 {
-    common_config
-    
-    # redirect fd 127 to stdout
-    exec 127>&1
+	common_config
 
-    if ${__FISSION_STDERR}; then
-        setsid ${FISSION_SHELL} -c "${*} 2>&1 1>&127 | setsid tee ${__FISSION_STDERR_TARGET}" &
-    else
-        setsid ${FISSION_SHELL} -c "${*}" 2>&1 &
-    fi
+	read -r -d '' __SV_CMDLINE <<-EOF
+		{ { exec ${@} | setsid awk '\$0="O: "\$0' >&127; } 2>&1 | setsid awk '\$0="E: "\$0' >&127 ; } 127>&1
+		EOF
+	__SV_CMDLINE=${__SV_CMDLINE}
+
+    setsid ${FISSION_SHELL} -c "${__SV_CMDLINE}" &
 
     # get group id
-    GROUP_LEADER_PID=$!
-    PROC_GROUP_ID=$(cat /proc/${GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
+    __GROUP_LEADER_PID=$!
+    __PROC_GROUP_ID=$(cat /proc/${__GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
 
     # install trap
     #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
     #   - keeps tee running; will exit on broken pipe
-    trap "kill -- -${PROC_GROUP_ID}; wait ${GROUP_LEADER_PID} >/dev/null" SIGINT SIGTERM
+    trap "kill -- -${__PROC_GROUP_ID}; wait ${__GROUP_LEADER_PID} >/dev/null 2>/dev/null" SIGINT SIGTERM
 
     # wait for command to finish (keep process running and forward signals)
-    wait >/dev/null
+    wait >/dev/null 2>/dev/null
 }
 
 ## run main command and handle stderr redirection in presence of auxilliary command
 main_logger()
 {
-    common_config
+	common_config
+	
+	__MAIN_LOGGER_NAME="main"
 
-    for fd in $(ls /proc/$$/fd); do
-        eval "exec ${fd}>&-"
-    done
+	mkdir -p ${__FISSION_LOGDIR}/app
+	# enable forwarding
+	if ${__FISSION_STDERR}; then
+		echo 'eE:*' > ${__FISSION_LOGDIR}/app/config
+	fi
 
-    # create FIFO to be used as "anonymous pipe"
-    # attach to file descriptor
-    # remove fifo link as cleanup step
-    # file descriptor will stay open as long as the shell
-    #------------------------------------------------------
-    PIPE=/tmp/$(mktemp -u fifo.XXXXXX)
-    mkfifo ${PIPE}
-    exec 127<>${PIPE}
-    # rm ${PIPE}
-    #------------------------------------------------------
-    
-    # attach logger
-    setsid nohup svlogd -tt ${__FISSION_LOGDIR}/app <${PIPE} &
-    # LOGGER_PID=$!
+	# create FIFO to be used as "anonymous pipe"
+	# attach to file descriptor
+	# remove fifo link as cleanup step
+	# file descriptor will stay open as long as the shell
+	#------------------------------------------------------
+	__PIPE=/tmp/$(mktemp -u fifo.XXXXXX)
+	mkfifo ${__PIPE}
+	exec 127<>${__PIPE}
+	# rm ${__PIPE}
+	#------------------------------------------------------
+	
+	read -r -d '' __MAIN_CMDLINE <<-EOF
+		{ exec ${@} | setsid awk '\$0="O: "\$0' >&127; } 2>&1 | setsid awk '\$0="E: "\$0' >&127
+		EOF
+	__MAIN_CMDLINE=${__MAIN_CMDLINE}
 
-    if ${__FISSION_STDERR}; then
-        setsid nohup ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; exec ${*} 2>&1 1>&127 | setsid nohup tee ${__FISSION_STDERR_TARGET} 1>&127" &
-    else
-        setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; exec ${*} 1>&127 2>&127" &
-    fi
+	setsid ${FISSION_SHELL} -c "trap ' ' SIGINT SIGTERM; ${__MAIN_CMDLINE}" &
 
-    # get group id
-    GROUP_LEADER_PID=$!
-    PROC_GROUP_ID=$(cat /proc/${GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
+	# get group id
+	__GROUP_LEADER_PID=$!
+	__PROC_GROUP_ID=$(cat /proc/${__GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
 
-    log_verbose "main process running in background with pgroup id ${PROC_GROUP_ID}"
+	log_verbose "main process running in background with pgroup id ${__PROC_GROUP_ID}"
 
-    # install trap
-    #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
-    #   - keeps tee running; will exit on broken pipe
-    #   - keeps svlogd running; will be terminated after succesfull wait on group leader
-    trap "trap ' ' SIGINT SIGTERM; kill -- -${PROC_GROUP_ID}; wait ${GROUP_LEADER_PID} >/dev/null; jobs > /dev/null; jobs -p | xargs -i kill {}; wait >/dev/null" SIGINT SIGTERM
+	# attach logger
+	read -r -d '' __LOGGER_CMDLINE <<-EOF
+		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' > ${__FISSION_STDERR_TARGET}
+		EOF
+	__LOGGER_CMDLINE=${__LOGGER_CMDLINE}
 
-    # wait for command to finish
-    wait ${GROUP_LEADER_PID}
+	setsid ${FISSION_SHELL} -c "${__LOGGER_CMDLINE}" <${__PIPE} &
+	
+	# install trap
+	#   - make SIGINT and SIGTERM send SIGTERM to child pgroup
+	#   - keeps tee running; will exit on broken pipe
+	#   - keeps svlogd running; will be terminated after succesfull wait on group leader
+	trap "trap ' ' SIGINT SIGTERM; kill -- -${__PROC_GROUP_ID}; wait ${__GROUP_LEADER_PID} 2>/dev/null >/dev/null; jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null" SIGINT SIGTERM
 
-    # terminate remaining background commands (svlogd)
-    jobs >/dev/null; jobs -p | xargs -i kill {}
-    wait >/dev/null
+	# wait for command to finish
+	wait ${__GROUP_LEADER_PID} 2>/dev/null >/dev/null
+
+	# terminate remaining background commands (svlogd)
+	jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}
+	wait 2>/dev/null >/dev/null
+	rm ${__PIPE}
 }
+
 
 ### MAIN
 ### multicall selector
 case "${FISSION_CALL}" in
-    "fission")          setup_init ${@} ;;
-    "fission-spawn")    select_shell ${@} ;;
-    "fission-run")      run ${@} ;;
-    "fission-runsv")    cmd_redirect_stderr ${@} ;;
-    "fission-auxmain")  main_logger ${@} ;;
-    "fission-getconf")  get_conf ${@} ;;
-    *)                  echo "fission called as unknown command" >&2; exit 1;;
+	"fission")          setup_init ${@} ;;
+	"fission-spawn")    select_shell ${@} ;;
+	"fission-run")      run ${@} ;;
+	"fission-runsv")    runsv_redirect ${@} ;;
+	"fission-auxmain")  main_logger ${@} ;;
+	"fission-getconf")  get_conf ${@} ;;
+	*)                  echo "fission called as unknown command" >&2; exit 1;;
 esac

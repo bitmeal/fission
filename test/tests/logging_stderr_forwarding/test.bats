@@ -20,7 +20,15 @@ setup() {
     run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
     assert_success
     
-    assert_line "[stderr] 01_srv"
+    assert_line --partial "[stderr] 01_srv"
+}
+
+@test "services: stderr forwarding [ON] - msg prefixed by service name" {
+
+    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
+    assert_success
+    
+    assert_line --regexp '^\[01_srv\]'
 }
 
 @test "services: stderr forwarding [OFF]" {

@@ -12,7 +12,21 @@ setup() {
     assert_success
     
     refute_output
-    assert_equal "${stderr}" "fission-init"
+
+    swap_stdout_stderr
+
+    assert_line --partial "fission-init"
+}
+
+@test "aux process: main stderr forwarding [ON] prefixed by '[main]'" {
+    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/echo_stderr.sh:/testbin/echo_stderr.sh ${IMAGE} /testbin/echo_stderr.sh -- sleep 1
+    assert_success
+    
+    refute_output
+
+    swap_stdout_stderr
+
+    assert_line --regexp '^\[main\]'
 }
 
 @test "aux process: main stderr forwarding [OFF]" {
