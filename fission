@@ -14,6 +14,7 @@ __FISSION_RUNSVDIR="/etc/service"
 __FISSION_LOGDIR="/var/log"
 __FISSION_RUNSVDIR_CMD="dumb-init --single-child --rewrite 2:1 --rewrite 15:1 -- runsvdir -P ${__FISSION_RUNSVDIR}"
 __FISSION_PID1_CMD="tini -g"
+__FISSION_SIGKILL_TIMEOUT=5
 # __FISSION_PID1_CMD="dumb-init"
 __FISSION_SILENT_REDIRECT=""
 __FISSION_STDERR="true"
@@ -69,6 +70,44 @@ common_config()
 
 	log_multicall
 }
+
+## supervision helpers
+killup()
+{
+	PIDS=""
+	for PID in ${@}; do
+		if [ -d /proc/${PID} ]; then
+			PIDS="${PIDS} ${PID}"
+		fi
+	done
+
+	if [ ! -z "${PIDS}" ]; then
+		log "escalating to SIGKILL after ${__FISSION_SIGKILL_TIMEOUT} for pids: ${PIDS}"
+		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -KILL {} 2>/dev/null
+	fi
+}
+
+schedule_killup()
+{
+	( (sleep ${__FISSION_SIGKILL_TIMEOUT}; killup ${@} ) & )
+}
+
+# cleanup helper/signal-handler to terminate (SIGTERM) jobs with SIGKILL timeout
+cleanup()
+{
+	# get running jobs
+	jobs >/dev/null 2>/dev/null
+	PIDS=$(jobs -p 2>/dev/null)
+
+	# terminate background jobs (using xargs prevents calling kill without argument)
+	echo ${PIDS} | tr ' ' '\n' | xargs -i kill -TERM {} 2>/dev/null
+	
+	# schedule SIGKILL handler in background with delay
+	schedule_killup ${PIDS}
+
+	wait 2>/dev/null >/dev/null
+}
+
 
 
 ### MULTICALL FUNCTIONS
@@ -176,6 +215,7 @@ select_shell()
 
 
 ## INIT STEP 3
+# clean background jobs, but send SIGKILL
 # setup environment
 # run init scripts
 # start services
@@ -252,7 +292,7 @@ run()
 		echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
 		read -r -d '' __SV_LOG_SCRIPT <<-EOF
 			#!${FISSION_SHELL}
-			# will be killed by broken pipes
+			# will be killed by broken pipes?
 			trap ' ' SIGINT SIGTERM
 			svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE} 2>&1 | awk -v name="${__FISSION_SERVICE}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' > ${__FISSION_STDERR_TARGET}
 			EOF
@@ -277,8 +317,7 @@ run()
 
 	### run services
 	log "starting services..."
-	# ( setsid ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
-	( ${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} & )
+	${__FISSION_RUNSVDIR_CMD} ${__FISSION_SILENT_REDIRECT} &
 
 	# wait to start runsvdir
 	# TODO: find better solution
@@ -300,6 +339,10 @@ run()
 
 
 	### exec
+	# install trap to ignore signals from init:
+	# all subprocesses should receive a sigint individually
+	trap 'cleanup' SIGINT SIGTERM
+
 	# build primary command till '--' or end of options
 	while [ ${#} -ne 0 ] && [ "${1}" != "--" ]; do
 		__FISSION_PRIMARY="${__FISSION_PRIMARY} ${1}"
@@ -310,45 +353,36 @@ run()
 	# has an auxilliary command after -- ?
 	if [ "${1}" = "--" ] && [ ${#} -gt 1 ]; then
 		# run primary command in background
-		log "running main process in background [logging to ${__FISSION_LOGDIR}/app]..."        
+		log "starting main process in background [logging to ${__FISSION_LOGDIR}/app]..."        
 		${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain ${__FISSION_PRIMARY} &
 
 		shift
+
+		# build auxilliary command
+		# __FISSION_AUXILLIARY=${@}
+		while [ ${#} -ne 0 ]; do
+			__FISSION_AUXILLIARY="${__FISSION_AUXILLIARY} ${1}"
+			shift
+		done
+		log_verbose "aux cmdl: ${__FISSION_AUXILLIARY}"
+		
+		# wait for main process (keep logging in order)
+		sleep 0.5
+		# run aux process
+		log "starting aux process..."
+		
+		eval "${__FISSION_AUXILLIARY}"
+
 	else
 		# run primary command in foreground and replace process
 		log "starting main process..."
 		# TODO: remove shell call
-		eval "exec ${__FISSION_PRIMARY}"
+		eval "${__FISSION_PRIMARY}"
 	fi
-
-	# -> process replaced here if no auxilliary command is given
-	# --
-
-
-	# build auxilliary command
-	# __FISSION_AUXILLIARY=${@}
-	while [ ${#} -ne 0 ]; do
-		__FISSION_AUXILLIARY="${__FISSION_AUXILLIARY} ${1}"
-		shift
-	done
-	log_verbose "aux cmdl: ${__FISSION_AUXILLIARY}"
-	
-
-	# install trap to ignore signals from init:
-	# all subprocesses should receive a sigint individually
-	trap 'jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null' SIGINT SIGTERM
-
-	# wait for main process (keep logging in order)
-	sleep 1
-	# run aux process
-	log "starting aux process..."
-	
-	eval "${__FISSION_AUXILLIARY}"
 	
 	# # send sigterm and/or wait for main process
-	log "auxilliary command exited sending SIGTERM to main..."
-	jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}
-	wait 2>/dev/null >/dev/null
+	log "foreground process exited sending SIGTERM and waiting for services and background operations..."
+	cleanup
 }
 
 
@@ -420,7 +454,7 @@ main_logger()
 	__GROUP_LEADER_PID=$!
 	__PROC_GROUP_ID=$(cat /proc/${__GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
 
-	log_verbose "main process running in background with pgroup id ${__PROC_GROUP_ID}"
+	log_verbose "main process running in background with pgroup pid: ${__GROUP_LEADER_PID}; pgid:${__PROC_GROUP_ID}"
 
 	# attach logger
 	read -r -d '' __LOGGER_CMDLINE <<-EOF
@@ -438,11 +472,13 @@ main_logger()
 
 	# wait for command to finish
 	wait ${__GROUP_LEADER_PID} 2>/dev/null >/dev/null
-
-	# terminate remaining background commands (svlogd)
-	jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}
-	wait 2>/dev/null >/dev/null
+	
+	# remove fifo and close file descriptor
 	rm ${__PIPE}
+	exec 127>&-
+	
+	# terminate remaining background commands (svlogd)
+	cleanup
 }
 
 
