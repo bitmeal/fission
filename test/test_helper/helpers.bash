@@ -34,11 +34,29 @@ print() {
     ([ ${#} -ne 0 ] && echo -e "${@}" || cat -) | sed 's/^/# /' >&3
 }
 
+swap_stdout_stderr()
+{
+    output_cache=${output}
+    lines_cache=("${lines[@]}")
+    
+    # use stderr with bats_assert
+    output=${stderr}
+    lines=("${stderr_lines[@]}")
+
+    # copy stderr back to stdout
+    stderr=${output_cache}
+    stderr_lines=("${lines_cache[@]}")
+
+    unset output_cache
+    unset lines_cache
+}
+
 # allow usage of yq for JSON and YAML parsing
 yq() {
   docker run --rm -i -v "${PWD}":/workdir mikefarah/yq "$@"
 }
 
+# make a uuid
 mkuuid() {
     if which uuidgen >/dev/null; then
         echo $(uuidgen)

@@ -24,8 +24,7 @@ setup() {
     refute_output
 
     # use stderr with bats_assert
-    output=${stderr}
-    lines=${stderr_lines}
+    swap_stdout_stderr
 
     assert_line --partial '[stderr] [SIGTERM] main'
 }
@@ -45,8 +44,7 @@ setup() {
     assert_line --partial '[stdout] [SIGTERM] main'
 
     # use stderr with bats_assert
-    output=${stderr}
-    lines=${stderr_lines}
+    swap_stdout_stderr
 
     assert_line --partial '[stderr] [SIGTERM] main'
 }
@@ -56,20 +54,18 @@ setup() {
     CONTAINER_ID=$(mkuuid)
     
     # send SIGTERM in 10 seconds
-    ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) &
+    ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) >/dev/null 2>/dev/null &
     # run test container
     run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js --name ${CONTAINER_ID} ${IMAGE} /testbin/signals.js main -- /testbin/signals.js aux
     # assert_success
     
-    assert_output --partial '[stdout] [SIGTERM] aux'
-
+    assert_line --partial '[stdout] [SIGTERM] aux'
+    
     # use stderr with bats_assert
-    output=${stderr}
-    lines=${stderr_lines}
+    swap_stdout_stderr
 
-    # fails with assert_line !?
-    assert_output --partial '[stderr] [SIGTERM] main'
-    assert_output --partial '[stderr] [SIGTERM] aux'
+    assert_line --partial '[stderr] [SIGTERM] main'
+    assert_line --partial '[stderr] [SIGTERM] aux'
 }
 
 @test "signal forwarding: to services from docker kill -s SIGTERM; rewriting SIGTERM to SIGHUP for runsvdir" {
@@ -77,11 +73,10 @@ setup() {
     CONTAINER_ID=$(mkuuid)
     
     # send SIGTERM in 10 seconds
-    ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) &
-    # run test container
+    ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) >/dev/null 2>/dev/null &
+    # run test container: make main terminate delayed by 1 second to keep streams open
     run -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js -v ${CTX}/delaysigexit.js:/testbin/delaysigexit.js --name ${CONTAINER_ID} ${IMAGE} /testbin/delaysigexit.js 1000
     assert_success
     
-    assert_output --partial '[stderr] [SIGTERM] 01_srv'
-
+    assert_line --partial '[stderr] [SIGTERM] 01_srv'
 }
