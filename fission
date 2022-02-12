@@ -417,7 +417,8 @@ runsv_redirect()
     trap "kill -- -${__PROC_GROUP_ID}; wait ${__PROC_GROUP_CHILD_PIDS} >/dev/null 2>/dev/null" SIGINT SIGTERM
 
     # wait for command to finish (keep process running and forward signals)
-    wait >/dev/null 2>/dev/null
+    wait ${__PROC_GROUP_CHILD_PIDS}
+	wait >/dev/null 2>/dev/null
 }
 
 ## run main command and handle stderr redirection in presence of auxilliary command
@@ -473,11 +474,13 @@ main_logger()
 	trap "trap ' ' SIGINT SIGTERM; kill -- -${__PROC_GROUP_ID}; wait ${__PROC_GROUP_CHILD_PIDS} 2>/dev/null >/dev/null; jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null" SIGINT SIGTERM
 
 	# wait for command to finish
-	wait ${__PROC_GROUP_LEADER_PID} 2>/dev/null >/dev/null
+	wait ${__PROC_GROUP_CHILD_PIDS} 2>/dev/null >/dev/null
 	
 	# remove fifo and close file descriptor
 	rm ${__PIPE}
 	exec 127>&-
+
+	wait 2>/dev/null >/dev/null
 	
 	# terminate remaining background commands (svlogd)
 	cleanup
