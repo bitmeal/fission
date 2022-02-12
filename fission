@@ -72,6 +72,21 @@ common_config()
 }
 
 ## supervision helpers
+# sync all file descriptors
+fd_sync_all()
+{
+	for PROC in $(ls -r /proc/); do
+        if [ -d /proc/${PROC}/fd ]; then
+                for FD in $(ls /proc/${PROC}/fd/); do
+                        sync -f /proc/${PROC}/fd/${FD} 2>/dev/null
+						sleep 0.01
+                done
+        fi
+	done
+}
+
+
+# send SIGKILL to all pids passed as parameter, snyc all file descriptors
 killup()
 {
 	PIDS=""
@@ -82,17 +97,21 @@ killup()
 	done
 
 	if [ ! -z "${PIDS}" ]; then
-		log "escalating to SIGKILL after ${__FISSION_SIGKILL_TIMEOUT} for pids: ${PIDS}"
+		log "escalating to SIGKILL after ${__FISSION_SIGKILL_TIMEOUT}s for pids: ${PIDS}"
+		pstree -p
 		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -KILL {} 2>/dev/null
 	fi
+
+	fd_sync_all
 }
 
+# schedule SIGKILL for pids
 schedule_killup()
 {
-	( (sleep ${__FISSION_SIGKILL_TIMEOUT}; killup ${@} ) & )
+	( (sleep ${__FISSION_SIGKILL_TIMEOUT}; killup ${@}) & )
 }
 
-# cleanup helper/signal-handler to terminate (SIGTERM) jobs with SIGKILL timeout
+# cleanup helper/signal-handler to terminate (SIGTERM) jobs of current shell + escalation to SIGKILL after timeout
 cleanup()
 {
 	# get running jobs
@@ -102,12 +121,19 @@ cleanup()
 	# terminate background jobs (using xargs prevents calling kill without argument)
 	echo ${PIDS} | tr ' ' '\n' | xargs -i kill -TERM {} 2>/dev/null
 	
+	log_verbose "scheduling SIGKILL for pids:  $(echo ${PIDS})"
 	# schedule SIGKILL handler in background with delay
 	schedule_killup ${PIDS}
-
-	wait 2>/dev/null >/dev/null
+	
+	log_verbose "waiting for response to SIGTERM from pids: $(echo ${PIDS})"
+	wait $(echo ${PIDS}) 2>/dev/null >/dev/null
+	fd_sync_all
 }
 
+proc_group_childs()
+{
+	ps -e -o pgid,pid | awk -v pgid=${1} '$1 == pgid {print $2}' | tr '\n' ' '
+}
 
 
 ### MULTICALL FUNCTIONS
@@ -382,6 +408,8 @@ run()
 	
 	# # send sigterm and/or wait for main process
 	log "foreground process exited sending SIGTERM and waiting for services and background operations..."
+	
+	# wait to trigger cleanup tasks of background shells first
 	cleanup
 }
 
@@ -409,16 +437,17 @@ runsv_redirect()
     # get group id
 	__PROC_GROUP_LEADER_PID=$!
 	__PROC_GROUP_ID=$(cat /proc/${__PROC_GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
-	__PROC_GROUP_CHILD_PIDS="$(ps -e -o pgid,pid | awk -v pgid=${__PROC_GROUP_ID} '$1 == pgid {print $2}' | tr '\n' ' ')"
+	__PROC_GROUP_CHILD_PIDS="$(proc_group_childs ${__PROC_GROUP_ID})"
 
     # install trap
     #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
     #   - keeps tee running; will exit on broken pipe
-    trap "kill -- -${__PROC_GROUP_ID}; wait ${__PROC_GROUP_CHILD_PIDS} >/dev/null 2>/dev/null" SIGINT SIGTERM
+    trap "kill -- -${__PROC_GROUP_ID} 2>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) >/dev/null 2>/dev/null; cleanup" SIGINT SIGTERM
 
     # wait for command to finish (keep process running and forward signals)
-    wait ${__PROC_GROUP_CHILD_PIDS}
+    wait $(proc_group_childs ${__PROC_GROUP_ID})
 	wait >/dev/null 2>/dev/null
+	cleanup
 }
 
 ## run main command and handle stderr redirection in presence of auxilliary command
@@ -455,7 +484,7 @@ main_logger()
 	# get group id
 	__PROC_GROUP_LEADER_PID=$!
 	__PROC_GROUP_ID=$(cat /proc/${__PROC_GROUP_LEADER_PID}/stat | cut -d ' ' -f 5)
-	__PROC_GROUP_CHILD_PIDS="$(ps -e -o pgid,pid | awk -v pgid=${__PROC_GROUP_ID} '$1 == pgid {print $2}' | tr '\n' ' ')"
+	__PROC_GROUP_CHILD_PIDS="$(proc_group_childs ${__PROC_GROUP_ID})"
 
 	log_verbose "main process running in background shell with pid: ${__PROC_GROUP_LEADER_PID}; pgid:${__PROC_GROUP_ID}; child pids: ${__PROC_GROUP_CHILD_PIDS}"
 
@@ -471,16 +500,10 @@ main_logger()
 	#   - make SIGINT and SIGTERM send SIGTERM to child pgroup
 	#   - keeps tee running; will exit on broken pipe
 	#   - keeps svlogd running; will be terminated after succesfull wait on group leader
-	trap "trap ' ' SIGINT SIGTERM; kill -- -${__PROC_GROUP_ID}; wait ${__PROC_GROUP_CHILD_PIDS} 2>/dev/null >/dev/null; jobs >/dev/null 2>/dev/null; jobs -p 2>/dev/null | xargs -i kill {}; wait 2>/dev/null >/dev/null" SIGINT SIGTERM
+	trap "trap ' ' SIGINT SIGTERM; log 'main trap begin'; kill -- -${__PROC_GROUP_ID} 2>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) 2>/dev/null >/dev/null; log 'main trap waited childs -> cleanup'; cleanup; log 'main trap end'" SIGINT SIGTERM
 
 	# wait for command to finish
-	wait ${__PROC_GROUP_CHILD_PIDS} 2>/dev/null >/dev/null
-	
-	# remove fifo and close file descriptor
-	rm ${__PIPE}
-	exec 127>&-
-
-	wait 2>/dev/null >/dev/null
+	wait $(proc_group_childs ${__PROC_GROUP_ID}) 2>/dev/null >/dev/null
 	
 	# terminate remaining background commands (svlogd)
 	cleanup

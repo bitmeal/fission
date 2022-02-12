@@ -69,14 +69,24 @@ setup() {
 }
 
 @test "signal forwarding: to services from docker kill -s SIGTERM; rewriting SIGTERM to SIGHUP for runsvdir" {
+    # make log mount
+    mkdir -p ${CTX}/bats_test_out
+
     # trigger SIGTERM to main by exiting aux
     CONTAINER_ID=$(mkuuid)
     
     # send SIGTERM in 10 seconds
     ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) >/dev/null 2>/dev/null &
     # run test container: make main terminate delayed by 1 second to keep streams open
-    run -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js -v ${CTX}/delaysigexit.js:/testbin/delaysigexit.js --name ${CONTAINER_ID} ${IMAGE} /testbin/delaysigexit.js 2000
+    run -- docker run --rm -v ${CTX}/bats_test_out/:/var/log/ -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js -v ${CTX}/delaysigexit.js:/testbin/delaysigexit.js --name ${CONTAINER_ID} ${IMAGE} /testbin/delaysigexit.js 2000
     assert_success
-    
+
+    # read service logs; console forwarding is to dependant on buffering
+    run -- cat ${CTX}/bats_test_out/01_srv/current
+    assert_success
+
     assert_line --partial '[stderr] [SIGTERM] 01_srv'
+    assert_line --partial '[stdout] [SIGTERM] 01_srv'
+
+    rm -rf ${CTX}/bats_test_out
 }
