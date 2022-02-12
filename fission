@@ -98,11 +98,10 @@ killup()
 
 	if [ ! -z "${PIDS}" ]; then
 		log "escalating to SIGKILL after ${__FISSION_SIGKILL_TIMEOUT}s for pids: ${PIDS}"
-		pstree -p
 		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -KILL {} 2>/dev/null
 	fi
 
-	fd_sync_all
+	fd_sync_all 2>/dev/null
 }
 
 # schedule SIGKILL for pids
@@ -127,7 +126,7 @@ cleanup()
 	
 	log_verbose "waiting for response to SIGTERM from pids: $(echo ${PIDS})"
 	wait $(echo ${PIDS}) 2>/dev/null >/dev/null
-	fd_sync_all
+	fd_sync_all 2>/dev/null
 }
 
 proc_group_childs()
