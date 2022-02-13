@@ -12,13 +12,14 @@ __FISSION_FILE="/etc/fission/fission.json"
 __FISSION_OVERLAY_DIR="/etc/fission/overlays"
 __FISSION_RUNSVDIR="/etc/service"
 __FISSION_LOGDIR="/var/log"
-__FISSION_RUNSVDIR_CMD="dumb-init --single-child --rewrite 2:1 --rewrite 15:1 -- runsvdir -P ${__FISSION_RUNSVDIR}"
+__FISSION_RUNSVDIR_CMD="dumb-init --single-child --rewrite 2:1 --rewrite 15:1 -- setsid runsvdir -P ${__FISSION_RUNSVDIR}"
 __FISSION_PID1_CMD="tini -g"
 __FISSION_SIGKILL_TIMEOUT=5
 # __FISSION_PID1_CMD="dumb-init"
 __FISSION_SILENT_REDIRECT=""
 __FISSION_STDERR="true"
 __FISSION_STDERR_TARGET="/proc/1/fd/2"
+__FISSION_LOG_TARGET="/proc/1/fd/1"
 
 
 ### MULTICALL SCRIPT
@@ -35,14 +36,14 @@ log_multicall()
 log()
 {
 	if ! ${__FISSION_SILENT}; then
-		printf "%s\n" "$@" | sed 's/^/> /g'
+		printf "%s\n" "$@" | sed 's/^/> /g' >${__FISSION_LOG_TARGET}
 	fi
 }
 
 log_verbose()
 {
 	if ${FISSION_VERBOSE}; then
-		printf "%s\n" "$@" | sed 's/^/# /g'
+		printf "%s\n" "$@" | sed 's/^/# /g' >${__FISSION_LOG_TARGET}
 	fi
 }
 
@@ -78,17 +79,22 @@ fd_sync_all()
 	for PROC in $(ls -r /proc/); do
         if [ -d /proc/${PROC}/fd ]; then
                 for FD in $(ls /proc/${PROC}/fd/); do
-                        sync -f /proc/${PROC}/fd/${FD} 2>/dev/null
-						sleep 0.01
+                        sync -f /proc/${PROC}/fd/${FD} &>/dev/null
+			sleep 0.01
                 done
         fi
 	done
 }
 
-
 # send SIGKILL to all pids passed as parameter, snyc all file descriptors
 killup()
 {
+	if [ "${1}" == "--ec" ]; then
+		shift
+		EXIT_CODE=${1}
+		shift
+	fi
+
 	PIDS=""
 	for PID in ${@}; do
 		if [ -d /proc/${PID} ]; then
@@ -98,35 +104,52 @@ killup()
 
 	if [ ! -z "${PIDS}" ]; then
 		log "escalating to SIGKILL after ${__FISSION_SIGKILL_TIMEOUT}s for pids: ${PIDS}"
-		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -KILL {} 2>/dev/null
+		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -KILL {} &>/dev/null
 	fi
 
-	fd_sync_all 2>/dev/null
+	#fd_sync_all &>/dev/null
+	if [ ! -z "${EXIT_CODE}" ]; then
+		exit ${EXIT_CODE}
+	fi
 }
 
 # schedule SIGKILL for pids
 schedule_killup()
 {
-	( (sleep ${__FISSION_SIGKILL_TIMEOUT}; killup ${@}) & )
+	if [ "${1}" == "--ec" ]; then
+		log_verbose "scheduling SIGKILL with final exit code: ${2}"
+		__EXIT_CODE_PARAM="--ec ${2}"
+		shift; shift
+	fi
+
+	log_verbose "scheduling SIGKILL for pids:  $(echo ${@})"
+	( (sleep ${__FISSION_SIGKILL_TIMEOUT}; killup ${__EXIT_CODE_PARAM} ${@}) & )
+	unset __EXIT_CODE_PARAM
 }
 
 # cleanup helper/signal-handler to terminate (SIGTERM) jobs of current shell + escalation to SIGKILL after timeout
 cleanup()
 {
 	# get running jobs
-	jobs >/dev/null 2>/dev/null
+	jobs &>/dev/null
 	PIDS=$(jobs -p 2>/dev/null)
 
-	# terminate background jobs (using xargs prevents calling kill without argument)
-	echo ${PIDS} | tr ' ' '\n' | xargs -i kill -TERM {} 2>/dev/null
-	
-	log_verbose "scheduling SIGKILL for pids:  $(echo ${PIDS})"
-	# schedule SIGKILL handler in background with delay
-	schedule_killup ${PIDS}
-	
-	log_verbose "waiting for response to SIGTERM from pids: $(echo ${PIDS})"
-	wait $(echo ${PIDS}) 2>/dev/null >/dev/null
-	fd_sync_all 2>/dev/null
+	if [ ! -z "${PIDS}" ]; then
+		# terminate background jobs (using xargs prevents calling kill without argument)
+		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -TERM {} &>/dev/null
+		
+		# schedule SIGKILL handler in background with delay
+		schedule_killup $( [ ! -z "${1}" ] && echo "--ec ${1}" ) ${PIDS}
+		
+		log_verbose "waiting for response to SIGTERM from pids: $(echo ${PIDS})"
+		wait $(echo ${PIDS}) &>/dev/null
+
+		#fd_sync_all &>/dev/null
+		if [ ! -z "${1}" ]; then
+			log "forwarding exit code: ${1}"
+			exit ${1}
+		fi
+	fi
 }
 
 proc_group_childs()
@@ -317,9 +340,11 @@ run()
 		echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
 		read -r -d '' __SV_LOG_SCRIPT <<-EOF
 			#!${FISSION_SHELL}
+			exec 2>${__FISSION_STDERR_TARGET}
 			# will be killed by broken pipes?
 			trap ' ' SIGINT SIGTERM
-			svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE} 2>&1 | awk -v name="${__FISSION_SERVICE}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' > ${__FISSION_STDERR_TARGET}
+			setsid svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE} 2>&1 | setsid awk -v name="${__FISSION_SERVICE}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' >&2
+			#> ${__FISSION_STDERR_TARGET}
 			EOF
 		__SV_LOG_SCRIPT=${__SV_LOG_SCRIPT}
 		echo "${__SV_LOG_SCRIPT}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
@@ -352,7 +377,7 @@ run()
 	log "waiting for services..."
 	for __FISSION_SERVICE in $(ls ${__FISSION_RUNSVDIR}); do
 		# wait 30 seconds for service to come up
-		sv -w 30 check ${__FISSION_RUNSVDIR}/${__FISSION_SERVICE} >/dev/null
+		sv -w 30 check ${__FISSION_RUNSVDIR}/${__FISSION_SERVICE} &>/dev/null
 
 		if [ $? -ne 0 ]; then
 			log "service ${__FISSION_SERVICE} not starting up! exiting"
@@ -397,19 +422,21 @@ run()
 		log "starting aux process..."
 		
 		eval "${__FISSION_AUXILLIARY}"
+		__FISISON_EXIT_CODE=$?
 
 	else
 		# run primary command in foreground and replace process
 		log "starting main process..."
 		# TODO: remove shell call
 		eval "${__FISSION_PRIMARY}"
+		__FISISON_EXIT_CODE=$?
 	fi
 	
 	# # send sigterm and/or wait for main process
 	log "foreground process exited sending SIGTERM and waiting for services and background operations..."
 	
 	# wait to trigger cleanup tasks of background shells first
-	cleanup
+	cleanup ${__FISISON_EXIT_CODE}
 }
 
 
@@ -431,7 +458,7 @@ runsv_redirect()
 		EOF
 	__SV_CMDLINE=${__SV_CMDLINE}
 
-    setsid ${FISSION_SHELL} -c "${__SV_CMDLINE}" &
+    ${FISSION_SHELL} -c "${__SV_CMDLINE}" &
 
     # get group id
 	__PROC_GROUP_LEADER_PID=$!
@@ -441,12 +468,12 @@ runsv_redirect()
     # install trap
     #   - make SIGINT and SIGTERM send SIGTERM to child pgroup
     #   - keeps tee running; will exit on broken pipe
-    trap "kill -- -${__PROC_GROUP_ID} 2>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) >/dev/null 2>/dev/null; cleanup" SIGINT SIGTERM
+    trap "kill -- -${__PROC_GROUP_ID} &>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null; cleanup" SIGINT SIGTERM
 
     # wait for command to finish (keep process running and forward signals)
-    wait $(proc_group_childs ${__PROC_GROUP_ID})
-	wait >/dev/null 2>/dev/null
-	cleanup
+    wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null
+    wait &>/dev/null
+    cleanup
 }
 
 ## run main command and handle stderr redirection in presence of auxilliary command
@@ -489,7 +516,9 @@ main_logger()
 
 	# attach logger
 	read -r -d '' __LOGGER_CMDLINE <<-EOF
-		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' > ${__FISSION_STDERR_TARGET}
+		exec 2>${__FISSION_STDERR_TARGET}
+		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' >&2
+		#> ${__FISSION_STDERR_TARGET}
 		EOF
 	__LOGGER_CMDLINE=${__LOGGER_CMDLINE}
 
@@ -499,10 +528,10 @@ main_logger()
 	#   - make SIGINT and SIGTERM send SIGTERM to child pgroup
 	#   - keeps tee running; will exit on broken pipe
 	#   - keeps svlogd running; will be terminated after succesfull wait on group leader
-	trap "trap ' ' SIGINT SIGTERM; log 'main trap begin'; kill -- -${__PROC_GROUP_ID} 2>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) 2>/dev/null >/dev/null; log 'main trap waited childs -> cleanup'; cleanup; log 'main trap end'" SIGINT SIGTERM
+	trap "trap ' ' SIGINT SIGTERM; log 'main trap begin'; kill -- -${__PROC_GROUP_ID} &>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null; log 'main trap waited childs -> cleanup'; cleanup; log 'main trap end'" SIGINT SIGTERM
 
 	# wait for command to finish
-	wait $(proc_group_childs ${__PROC_GROUP_ID}) 2>/dev/null >/dev/null
+	wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null
 	
 	# terminate remaining background commands (svlogd)
 	cleanup
