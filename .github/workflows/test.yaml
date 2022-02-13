@@ -24,5 +24,26 @@ jobs:
         FISSION_PLATFORM: ${{ matrix.platform }}
       run: ./test.bash -t
 
+    - name: Prepare status artifact [${{ matrix.platform }}]
+      if: ${{ always() }}
+      run: |
+        mkdir status &&
+        echo '{}' | jq --arg job "${{ matrix.platform }}" '. + {job: $platform}' > status/${{ matrix.platform }}.json
+    - name: Finalize status artifact @success
+      if: ${{ success() }}
+      run: |
+        cat status/${{ matrix.platform }}.json | jq --argjson success true '. + {success: $success}' | sponge status/${{ matrix.platform }}.json
+    - name: Finalize status artifact @failure
+      if: ${{ failure() }}
+      run: |
+        cat status/${{ matrix.platform }}.json | jq --argjson success false '. + {success: $success}' | sponge status/${{ matrix.platform }}.json
+    - name: Upload status artifact [${{ matrix.platform }}.json]
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: status
+        path: status/    
+
+
 
 

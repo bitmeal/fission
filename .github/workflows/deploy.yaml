@@ -35,6 +35,35 @@ jobs:
         name: Log Output
         run: "echo tag string: ${{ steps.version.outputs.num }}; echo is tag: ${{ steps.tag.outputs.truthy }}"
 
+  report:
+    runs-on: ubuntu-latest
+    needs:
+      - test
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        check-latest: true
+    - name: Fetch Dependencies
+      working-directory: helpers
+      run: sudo apt install -qq -y jq && npm ci
+    - name: Fetch matrix jobs status artifacts
+      uses: actions/download-artifact@v2
+      with:
+        path: platforms
+    - name: Build Matrix Badges
+      run: |
+        jq -s '.' platforms/*.json | node helpers/badgebuilder.js > badges.svg
+    - name: Deploy Badges
+      uses: exuanbo/actions-deploy-gist@v1
+      with:
+        token: ${{ secrets.GIST_TOKEN }}
+        gist_id: 07de6fdf05546612b9abfbc85a2beafc
+        gist_description: "https://github.com/bitmeal/fission test job badges"
+        gist_file_name: fission_badges.svg
+        file_path: ./badges.svg
+
   docker:
     needs:
       - test

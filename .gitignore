@@ -1,3 +1,5 @@
 .vscode/
+
+node_modules/
+
 scrap/
-bats_test_out/
