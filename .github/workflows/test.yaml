@@ -14,9 +14,9 @@ jobs:
       matrix:
         platform: [alpine, centos, debian, opensuse, ubuntu]
     steps:
-    - 
-      name: Clone
-      uses: actions/checkout@v2
+    -
+      name: Fetch Dependencies
+      run: sudo apt install -qq -y jq moreutils
     -
       name: Run Tests
       working-directory: test
