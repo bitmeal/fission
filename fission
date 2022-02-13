@@ -47,6 +47,14 @@ log_verbose()
 	fi
 }
 
+_passback()
+{
+	while [ 0 -lt $# ]; do
+		printf '%s='"'"'%s'"';" "$1" "$(eval echo '${'${1}'}')"
+		shift
+	done
+}
+
 common_config()
 {
 	# verbosity
@@ -69,7 +77,22 @@ common_config()
 	# stderr forwarding
 	__FISSION_STDERR=$(echo "${FISSION_CONFIG}" | jq -e 'if has("stderr") then .stderr else true end')
 
+	## program options
+	# awk
+	__FISSION_AWK_OPTIONS=""
+	if [ -z "$(awk -W interactive '' 2>&1)" ]; then
+		__FISSION_AWK_OPTIONS="-W interactive"
+	fi
+
+	__FISSION_AWK_FLUSH=""
+	if [ -z "$(echo 'test awk' | awk '$1; fflush()' | uniq -d)" ]; then
+		__FISSION_AWK_FLUSH='; fflush()'
+	fi
+
 	log_multicall
+
+	log_verbose "common config: $(_passback __FISSION_AWK_FLUSH __FISSION_AWK_OPTIONS __FISSION_STDERR __FISSION_SILENT FISSION_VERBOSE)"
+	_passback __FISSION_AWK_FLUSH __FISSION_AWK_OPTIONS __FISSION_STDERR __FISSION_SILENT FISSION_VERBOSE
 }
 
 ## supervision helpers
@@ -140,7 +163,7 @@ cleanup()
 
 proc_group_childs()
 {
-	ps -e -o pgid,pid | awk -v pgid=${1} '$1 == pgid {print $2}' | tr '\n' ' '
+	ps -e -o pgid,pid 2>/dev/null | awk -v pgid=${1} '$1 == pgid {print $2}' | tr '\n' ' '
 }
 
 
@@ -209,7 +232,7 @@ setup_init() #${@}
 	export FISSION_CONFIG="$(${FISSION_SHELL} ${FISSION_PATH}/fission-getconf)"
 
 	# setup common configuration variables
-	common_config
+	eval $(common_config)
 
 	## logging
 	# postponed logging after config has been read to respect silence flag
@@ -236,7 +259,7 @@ setup_init() #${@}
 select_shell()
 {
 	# setup common configuration variables
-	common_config
+	eval $(common_config)
 
 	# respawn with shell from /etc/passwd
 	if [ -z ${FISSION_SHELL} ]; then
@@ -257,7 +280,7 @@ select_shell()
 run()
 {
 	# setup common configuration variables
-	common_config
+	eval $(common_config)
 
 	### load env
 	# TODO: use jq @sh quoting?
@@ -329,7 +352,7 @@ run()
 			exec 2>${__FISSION_STDERR_TARGET}
 			# will be killed by broken pipes?
 			trap ' ' SIGINT SIGTERM
-			setsid svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE} 2>&1 | setsid awk -v name="${__FISSION_SERVICE}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' >&2
+			setsid svlogd -tt ${__FISSION_LOGDIR}/${__FISSION_SERVICE} 2>&1 | setsid awk ${__FISSION_AWK_OPTIONS} -v name="${__FISSION_SERVICE}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print ${__FISSION_AWK_FLUSH}}' >&2
 			#> ${__FISSION_STDERR_TARGET}
 			EOF
 		__SV_LOG_SCRIPT=${__SV_LOG_SCRIPT}
@@ -437,10 +460,10 @@ run()
 # TODO: remove additional shell call?
 runsv_redirect()
 {
-	common_config
+	eval $(common_config)
 
 	read -r -d '' __SV_CMDLINE <<-EOF
-		{ { exec ${@} | setsid awk '\$0="O: "\$0' >&127; } 2>&1 | setsid awk '\$0="E: "\$0' >&127 ; } 127>&1
+		{ { exec ${@} | setsid awk ${__FISSION_AWK_OPTIONS} '\$0="O: "\$0 ${__FISSION_AWK_FLUSH}' >&127; } 2>&1 | setsid awk ${__FISSION_AWK_OPTIONS} '\$0="E: "\$0 ${__FISSION_AWK_FLUSH}' >&127 ; } 127>&1
 		EOF
 	__SV_CMDLINE=${__SV_CMDLINE}
 
@@ -465,7 +488,7 @@ runsv_redirect()
 ## run main command and handle stderr redirection in presence of auxilliary command
 main_logger()
 {
-	common_config
+	eval $(common_config)
 	
 	__MAIN_LOGGER_NAME="main"
 
@@ -487,7 +510,7 @@ main_logger()
 	#------------------------------------------------------
 	
 	read -r -d '' __MAIN_CMDLINE <<-EOF
-		{ exec ${@} | setsid awk '\$0="O: "\$0' >&127; } 2>&1 | setsid awk '\$0="E: "\$0' >&127
+		{ exec ${@} | setsid awk ${__FISSION_AWK_OPTIONS} '\$0="O: "\$0 ${__FISSION_AWK_FLUSH}' >&127; } 2>&1 | setsid awk ${__FISSION_AWK_OPTIONS} '\$0="E: "\$0 ${__FISSION_AWK_FLUSH}' >&127
 		EOF
 	__MAIN_CMDLINE=${__MAIN_CMDLINE}
 
@@ -503,7 +526,7 @@ main_logger()
 	# attach logger
 	read -r -d '' __LOGGER_CMDLINE <<-EOF
 		exec 2>${__FISSION_STDERR_TARGET}
-		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print}' >&2
+		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk ${__FISSION_AWK_OPTIONS} -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print ${__FISSION_AWK_FLUSH}}' >&2
 		#> ${__FISSION_STDERR_TARGET}
 		EOF
 	__LOGGER_CMDLINE=${__LOGGER_CMDLINE}
@@ -514,7 +537,7 @@ main_logger()
 	#   - make SIGINT and SIGTERM send SIGTERM to child pgroup
 	#   - keeps tee running; will exit on broken pipe
 	#   - keeps svlogd running; will be terminated after succesfull wait on group leader
-	trap "trap ' ' SIGINT SIGTERM; log 'main trap begin'; kill -- -${__PROC_GROUP_ID} &>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null; log 'main trap waited childs -> cleanup'; cleanup; log 'main trap end'" SIGINT SIGTERM
+	trap "trap ' ' SIGINT SIGTERM; log_verbose 'executing background main process signal handler'; kill -- -${__PROC_GROUP_ID} &>/dev/null; wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null; log_verbose 'background main process signal handler waited childs -> cleanup'; cleanup" SIGINT SIGTERM
 
 	# wait for command to finish
 	wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null
