@@ -17,6 +17,10 @@ jobs:
     -
       name: Fetch Dependencies
       run: sudo apt install -qq -y jq moreutils
+
+    - 
+      name: Clone
+      uses: actions/checkout@v2
     -
       name: Run Tests
       working-directory: test
