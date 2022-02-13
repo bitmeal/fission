@@ -32,5 +32,13 @@ const badges = matrix
         return doc;
     }, SVG());
 
+const viewbox = badges.bbox();
+badges.viewbox(
+    viewbox.x,
+    viewbox.y,
+    viewbox.width,
+    viewbox.height
+);
+
 // print horizontal badge row svg to stdout
 console.log(badges.svg());
