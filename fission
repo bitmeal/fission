@@ -73,18 +73,6 @@ common_config()
 }
 
 ## supervision helpers
-# sync all file descriptors
-fd_sync_all()
-{
-	for PROC in $(ls -r /proc/); do
-        if [ -d /proc/${PROC}/fd ]; then
-                for FD in $(ls /proc/${PROC}/fd/); do
-                        sync -f /proc/${PROC}/fd/${FD} &>/dev/null
-			sleep 0.01
-                done
-        fi
-	done
-}
 
 # send SIGKILL to all pids passed as parameter, snyc all file descriptors
 killup()
@@ -107,7 +95,6 @@ killup()
 		echo ${PIDS} | tr ' ' '\n' | xargs -i kill -KILL {} &>/dev/null
 	fi
 
-	#fd_sync_all &>/dev/null
 	if [ ! -z "${EXIT_CODE}" ]; then
 		exit ${EXIT_CODE}
 	fi
@@ -144,7 +131,6 @@ cleanup()
 		log_verbose "waiting for response to SIGTERM from pids: $(echo ${PIDS})"
 		wait $(echo ${PIDS}) &>/dev/null
 
-		#fd_sync_all &>/dev/null
 		if [ ! -z "${1}" ]; then
 			log "forwarding exit code: ${1}"
 			exit ${1}
