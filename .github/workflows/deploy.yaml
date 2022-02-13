@@ -55,7 +55,7 @@ jobs:
         path: platforms
     - name: Build Matrix Badges
       run: |
-        jq -s '.' platforms/*.json | node helpers/badgebuilder.js > badges.svg
+        jq -s '.' platforms/status/*.json | node helpers/badgebuilder.js > badges.svg
     - name: Deploy Badges
       uses: exuanbo/actions-deploy-gist@v1
       with:
