@@ -28,7 +28,7 @@ jobs:
       if: ${{ always() }}
       run: |
         mkdir status &&
-        echo '{}' | jq --arg job "${{ matrix.platform }}" '. + {job: $platform}' > status/${{ matrix.platform }}.json
+        echo '{}' | jq --arg job "${{ matrix.platform }}" '. + {job: $job}' > status/${{ matrix.platform }}.json
     - name: Finalize status artifact @success
       if: ${{ success() }}
       run: |

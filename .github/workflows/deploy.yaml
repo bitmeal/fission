@@ -36,6 +36,7 @@ jobs:
         run: "echo tag string: ${{ steps.version.outputs.num }}; echo is tag: ${{ steps.tag.outputs.truthy }}"
 
   report:
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     needs:
       - test
