@@ -8,8 +8,15 @@ setup() {
 }
 
 @test "fission config: silence info logging" {
-    run -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} true
+    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json ${IMAGE} true
     assert_success
     
     refute_output
+}
+
+@test "fission config: info logging with prefix" {
+    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json ${IMAGE} true
+    assert_success
+    
+    assert_output --partial "> starting"
 }

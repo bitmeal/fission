@@ -6,20 +6,21 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
 
 **fission init** simplifies the process of setting up your environment, running init scripts, supervising services with automatic logging and allows for simple introspection. All by means of a simple json file.
 
-### Requirements
-* A mostly POSIX compatible shell, with
-  * `sed`
-  * `cut`
-  * `tail`
-  * `xargs`
+### Dependencies
+* A mostly POSIX compatible shell interpreter
+* `awk`
+* `cut`
+* `xargs`
+* `ps` and a `kill` variant callable by `xargs`
+
+> **POSIX** compatibility is **no** design goal! This project is targeting Linux containers.
+
+#### *Provided* dependencies (from docker image)
 * `tini` as PID1
 * `runsvdir`(`runit`) for service supervision
 * `dumb-init` for signal rewriting to `runsvdir`
 * `jq`
 
-> **POSIX** compatibility is **no** design goal! This project is targeting Linux containers.
-
-Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided (*see bottom of this README*).
 
 ### 📌 **why "fission"?**
 > 
@@ -65,14 +66,15 @@ As seen above, you can copy all required files form the provided docker image `g
 
 Available tags to pull:
 * `latest`: latest tagged version
-* `v<version>`: specific tagged version
+* `v<semver>`: specific tagged version
 * `edge`: latest commit on master
 ### manual setup
-
 * copy `fission` to a destination of your choice within your container
 * install `tini`, `dumb-init`, `runit` and `jq`
 
 ## features
+> Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided (*see bottom of this README*).
+
 ### PID1
 **fission init**s' `fission` script replaces itself with `tini` as popper PID1, when ran as PID1 itself. `tini` is used for its signal forwarding capabilities with process group scope. E.g. `fpco/pid1` or `dumb-init` will break our signal forwarding or error forwarding capabilities.
 

@@ -36,14 +36,14 @@ log_multicall()
 log()
 {
 	if ! ${__FISSION_SILENT}; then
-		printf "%s\n" "$@" | sed 's/^/> /g' >${__FISSION_LOG_TARGET}
+		printf "%s\n" "$@" | awk '$0="> "$0' >${__FISSION_LOG_TARGET}
 	fi
 }
 
 log_verbose()
 {
 	if ${FISSION_VERBOSE}; then
-		printf "%s\n" "$@" | sed 's/^/# /g' >${__FISSION_LOG_TARGET}
+		printf "%s\n" "$@" | awk '$0="# "$0' >${__FISSION_LOG_TARGET}
 	fi
 }
 
