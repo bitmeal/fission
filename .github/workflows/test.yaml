@@ -12,12 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [alpine, debian, opensuse, ubuntu]
-        experimental: [false]
-        include:
-          - platform: centos
-            experimental: true
-    continue-on-error: ${{ matrix.experimental }}
+        platform: [alpine, debian, ubuntu, centos, opensuse]
     steps:
     -
       name: Fetch Dependencies
