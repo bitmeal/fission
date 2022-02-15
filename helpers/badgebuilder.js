@@ -26,7 +26,9 @@ const default_icon = 'linux';
 function icon_resolver(name)
 {
     const mapping = {
-        opensuse: 'suse'
+        opensuse: 'suse',
+        amazonlinux: 'aws',
+        'redhat-ubi8': 'redhat'
     };
     return mapping[name] || name;
 }

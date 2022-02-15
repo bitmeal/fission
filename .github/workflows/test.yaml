@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [alpine, debian, ubuntu, opensuse , centos]
+        platform: [alpine, debian, ubuntu, opensuse , centos, redhat-ubi8, amazonlinux]
     #     experimental: [false]
     #     include:
     #       - platform: centos
