@@ -11,6 +11,7 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
 * `awk`
 * `cut`
 * `xargs`
+* `setsid`
 * `ps` and a `kill` variant callable by `xargs`
 
 > **POSIX** compatibility is **no** design goal! This project is targeting Linux containers.

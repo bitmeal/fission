@@ -4,6 +4,8 @@
     "@fortawesome/free-brands-svg-icons": "^6.0.0",
     "@svgdotjs/svg.js": "^3.1.2",
     "badgen": "^3.2.2",
-    "svgdom": "^0.1.10"
+    "font-logos": "^0.18.0",
+    "svgdom": "^0.1.10",
+    "svgo": "^2.8.0"
   }
 }
