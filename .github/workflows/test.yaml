@@ -13,11 +13,14 @@ jobs:
       fail-fast: false
       matrix:
         platform: [alpine, debian, ubuntu, opensuse , fedora, redhat-ubi8, almalinux, rockylinux, amazonlinux]
+        init:     [true, false]
     #     experimental: [false]
     #     include:
     #       - platform: centos
     #         experimental: true
     # continue-on-error: ${{ matrix.experimental }}
+    env:
+      FISSION_DOCKER_INIT: ${{ matrix.init }}
     steps:
     -
       name: Fetch Dependencies
@@ -33,25 +36,25 @@ jobs:
         FISSION_PLATFORM: ${{ matrix.platform }}
       run: ./test.bash -t
 
-    - name: Prepare status artifact [${{ matrix.platform }}]
+    - name: "Prepare status artifact [${{ matrix.platform }}][init: ${{ matrix.init }}]"
       if: ${{ always() }}
       run: |
-        mkdir status &&
-        echo '{}' | jq --arg job "${{ matrix.platform }}" '. + {job: $job}' > status/${{ matrix.platform }}.json
+        mkdir -p status/init_${{ matrix.init }} &&
+        echo '{}' | jq --arg job "${{ matrix.platform }}" '. + {job: $job}' > status/init_${{ matrix.init }}/${{ matrix.platform }}.json
     - name: Finalize status artifact @success
       if: ${{ success() }}
       run: |
-        cat status/${{ matrix.platform }}.json | jq --argjson success true '. + {success: $success}' | sponge status/${{ matrix.platform }}.json
+        cat status/init_${{ matrix.init }}/${{ matrix.platform }}.json | jq --argjson success true '. + {success: $success}' | sponge status/init_${{ matrix.init }}/${{ matrix.platform }}.json
     - name: Finalize status artifact @failure
       if: ${{ failure() }}
       run: |
-        cat status/${{ matrix.platform }}.json | jq --argjson success false '. + {success: $success}' | sponge status/${{ matrix.platform }}.json
+        cat status/init_${{ matrix.init }}/${{ matrix.platform }}.json | jq --argjson success false '. + {success: $success}' | sponge status/init_${{ matrix.init }}/${{ matrix.platform }}.json
     - name: Upload status artifact [${{ matrix.platform }}.json]
       if: ${{ !cancelled() }}
       uses: actions/upload-artifact@v2
       with:
         name: status
-        path: status/    
+        path: status/init_${{ matrix.init }}
 
 
 

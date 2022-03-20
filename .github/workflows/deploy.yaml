@@ -38,6 +38,14 @@ jobs:
   report:
     if: ${{ always() }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - init: false
+            gist_id: 07de6fdf05546612b9abfbc85a2beafc
+          - init: true
+            gist_id: 8080120d08c7039f90bd2b6b4cb05176
     needs:
       - test
     steps:
@@ -55,15 +63,15 @@ jobs:
         path: platforms
     - name: Build Matrix Badges
       run: |
-        jq -s '.' platforms/status/*.json | node helpers/badgebuilder.js > badges.svg
+        jq -s '.' platforms/status/init_${{ matrix.init }}/*.json | node helpers/badgebuilder.js > badges_init-${{ matrix.init }}.svg
     - name: Deploy Badges
       uses: exuanbo/actions-deploy-gist@v1
       with:
         token: ${{ secrets.GIST_TOKEN }}
-        gist_id: 07de6fdf05546612b9abfbc85a2beafc
-        gist_description: "https://github.com/bitmeal/fission test job badges"
-        gist_file_name: fission_badges.svg
-        file_path: ./badges.svg
+        gist_id: ${{ matrix.gist_id }}
+        gist_description: "https://github.com/bitmeal/fission test job badges for init:${{ matrix.init }}"
+        gist_file_name: fission_badges_init-${{ matrix.init }}.svg
+        file_path: ./badges_init-${{ matrix.init }}
 
   docker:
     needs:
