@@ -9,17 +9,17 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
 ### Dependencies
 * A mostly POSIX compatible shell interpreter
 * `awk`
-* `cut`
 * `xargs`
 * `setsid`
-* `ps` and a `kill` variant callable by `xargs`
+* `ps` and `kill` variants callable by `xargs` (non builtins)
+* staples like `cut`, `tr`, `ln`, `mkdir`, `mkfifo`, `sleep`, ... (available on all tested images)
+
 
 > **POSIX** compatibility is **no** design goal! This project is targeting Linux containers.
 
 #### *Provided* dependencies (from docker image)
-* `tini` as PID1
+* `tini` as PID1; or run using `docker run --init` and `docker-init` binary will be reused
 * `runsvdir`(`runit`) for service supervision
-* `dumb-init` for signal rewriting to `runsvdir`
 * `jq`
 
 
@@ -71,13 +71,13 @@ Available tags to pull:
 * `edge`: latest commit on master
 ### manual setup
 * copy `fission` to a destination of your choice within your container
-* install `tini`, `dumb-init`, `runit` and `jq`
+* install `runit` and `jq`, and `tini` or choose to use `docker-init` with `docker run --init`
 
 ## features
 > Partial compatibility with existing schemes for environment initialization and `runit` supervision is provided (*see bottom of this README*).
 
 ### PID1
-**fission init**s' `fission` script replaces itself with `tini` as popper PID1, when ran as PID1 itself. `tini` is used for its signal forwarding capabilities with process group scope. E.g. `fpco/pid1` or `dumb-init` will break our signal forwarding or error forwarding capabilities.
+**fission init**s' `fission` script replaces itself with `tini` as popper PID1, when ran as PID1 itself. `tini` is used for its signal forwarding capabilities with process group scope. E.g. `fpco/pid1` or `dumb-init` will break our signal forwarding or error forwarding capabilities. You can choose to use dockers own init by passing the `--init` flag to docker when running your container. This will mount a statically linked variant of `tini` in your container as `docker-init`. We will reuse this init binary and call it with the required parameters as an additional "layer" with PID=2.
 
 ### main & aux process
 **fission init** adheres to the idea of *one application/service per container*, while this application may depend on the presence of other services. These services are thought to be tightly coupled to your application and not to be shared outside of the container!
@@ -134,7 +134,7 @@ Environment variables are configured as a dictionary under key `env`, with the v
 ```
 
 ### init scripts
-Provide init scripts, or directories containing init scripts, to be **`source`d** in your environment as a dictionary under the key `init`. The keys/names of your init scripts will be used to determine sourcing order and enable overlay functionality (see below). Ordering is based on unicode codepoint order, as implemented by `jq`.
+Provide init scripts, or directories containing init scripts, to be **`source`d** in your environment as a dictionary under the key `init`. The keys/names of your init scripts will be used to determine sourcing order and enable overlay functionality (see below). Ordering is based on unicode codepoint order, as implemented by `jq`. Working directory while sourcing is either the scripts directory (is script path is given), or the specified directory (if directory is given).
 ```json
 // fission.json [/etc/fission/fission.json]
 {

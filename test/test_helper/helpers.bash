@@ -11,6 +11,9 @@ _common_setup() {
 
     IMAGE="fission:${FISSION_PLATFORM}"
     # print "[${BATS_TEST_NAME}] using image: ${IMAGE}"
+
+    INIT=$(if ${FISSION_DOCKER_INIT}; then echo "--init"; fi)
+    # print "[${BATS_TEST_NAME}] using init flag: ${INIT}"
 }
 
 # test for image availability and build if not

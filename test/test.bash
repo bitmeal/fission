@@ -18,6 +18,13 @@ if [ -z "${FISSION_PLATFORM}" ]; then
     export FISSION_PLATFORM="alpine"
 fi
 
+## check if want to use docker-init (docker run --init)
+if [ -z "${FISSION_DOCKER_INIT}" ]; then
+    echo "# FISSION_DOCKER_INIT not specified; using own init"
+    export FISSION_DOCKER_INIT=false
+fi
+
+
 ## run tests
 export LC_COLLATE=C
 bats/bin/bats ${@} -r ./tests

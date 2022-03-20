@@ -9,7 +9,7 @@ setup() {
 
 @test "services: stderr forwarding [ON] - empty stdout" {
 
-    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
+    run --separate-stderr -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${INIT} ${IMAGE} sleep 2
     assert_success
     
     refute_output
@@ -17,7 +17,7 @@ setup() {
 
 @test "services: stderr forwarding [ON] - msg on stderr" {
 
-    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
+    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${INIT} ${IMAGE} sleep 2
     assert_success
     
     assert_line --partial "[stderr] 01_srv"
@@ -25,7 +25,7 @@ setup() {
 
 @test "services: stderr forwarding [ON] - msg prefixed by service name" {
 
-    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
+    run -- docker run --rm -v ${CTX}/on.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${INIT} ${IMAGE} sleep 2
     assert_success
     
     assert_line --regexp '^\[01_srv\]'
@@ -33,7 +33,7 @@ setup() {
 
 @test "services: stderr forwarding [OFF]" {
 
-    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${IMAGE} sleep 2
+    run -- docker run --rm -v ${CTX}/off.json:/etc/fission/fission.json -v ${CTX}/printer.js:/testbin/printer.js ${INIT} ${IMAGE} sleep 2
     assert_success
     
     refute_output

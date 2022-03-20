@@ -10,7 +10,7 @@ setup() {
 @test "fission config: verbose logging; overriding silent config" {
     # CTX is test file location
     # IMAGE is docker image:tag for platform to test
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${IMAGE} true
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE} true
     assert_success
     
     assert_line --partial '# silent: false'

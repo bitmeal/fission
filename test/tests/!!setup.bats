@@ -13,3 +13,11 @@ setup() {
 @test "testing: ensure image availability (build)" {
     _ensure_image
 }
+
+@test "info: check --init flag (using docker-init [docker run --init])" {
+  case "${INIT}" in
+    "")         skip "has no init flag";;
+    "--init")   skip "using docker-init";;
+    *)          false log "unknown init flag in \${INIT}";;
+  esac
+}

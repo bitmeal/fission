@@ -8,6 +8,6 @@ setup() {
 }
 
 @test "config/fission.json: fail on missing file" {
-    run -- docker run --rm ${IMAGE} true
+    run -- docker run --rm ${INIT} ${IMAGE} true
     assert_failure
 }

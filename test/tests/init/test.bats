@@ -9,7 +9,7 @@ setup() {
 
 @test "init: run init scripts in order" {
 	# execute init scripts from directories or commands/scripts
-	run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -v ${CTX}/init.d/:/testbin/init.d/ ${IMAGE} true
+	run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -v ${CTX}/init.d/:/testbin/init.d/ ${INIT} ${IMAGE} true
 	assert_success
 
 	assert_output - <<- EOF

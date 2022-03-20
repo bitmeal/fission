@@ -8,6 +8,6 @@ setup() {
 }
 
 @test "config/fission.json: fail on malformated/invalid JSON" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${IMAGE} true
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE} true
     assert_failure
 }

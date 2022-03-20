@@ -8,7 +8,7 @@ setup() {
 }
 
 @test "env: export environment variables" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${IMAGE} echo "\${FOO}-\${BAR}"
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${INIT} ${IMAGE} echo "\${FOO}-\${BAR}"
 	assert_success
 
     assert_equal "${output}" "fission-init"
