@@ -1,8 +1,8 @@
 FROM amazonlinux:latest
 
 
-# setsid is missing
-RUN yum install -y util-linux
+# ps and setsid are missing
+RUN yum install -y util-linux procps
 
 # add testing tools
 # RUN yum install -y procps psmisc htop nano tmux

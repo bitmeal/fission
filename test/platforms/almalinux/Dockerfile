@@ -1,6 +1,9 @@
 FROM almalinux:latest
 
 
+# requires procps package for 'ps'
+RUN dnf install -y procps
+
 # add testing tools
 # RUN dnf install -y procps psmisc htop nano tmux
 RUN dnf install -y nodejs npm && npm install -g chalk
