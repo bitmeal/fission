@@ -71,7 +71,7 @@ jobs:
         gist_id: ${{ matrix.gist_id }}
         gist_description: "https://github.com/bitmeal/fission test job badges for init:${{ matrix.init }}"
         gist_file_name: fission_badges_init-${{ matrix.init }}.svg
-        file_path: ./badges_init-${{ matrix.init }}
+        file_path: ./badges_init-${{ matrix.init }}.svg
 
   docker:
     needs:
