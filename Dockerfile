@@ -21,6 +21,9 @@ FROM alpine:latest as builder
         ARG JQ_VER=jq-1.6
         # no arm builds are supplied, so we build from source
         RUN \
+            if [ -z "${TARGETPLATFORM}" ]; then \
+                TARGETPLATFORM="$(uname -m)" ; \
+            fi ; \
             if [ -z "${TARGETPLATFORM##*arm64*}" -o -z "${TARGETPLATFORM##*aarch64*}" ]; then \
                 echo "building jq from source for ARM"; \
                 apk add git libtool automake autoconf && \
@@ -40,6 +43,9 @@ FROM alpine:latest as builder
     WORKDIR /tini
         ARG TINI_VER=v0.19.0
         RUN \
+            if [ -z "${TARGETPLATFORM}" ]; then \
+                TARGETPLATFORM="$(uname -m)" ; \
+            fi ; \
             if [ -z "${TARGETPLATFORM##*arm64*}" -o -z "${TARGETPLATFORM##*aarch64*}" ]; then \
                 echo "selecting tini for ARM"; \
                 export TINI_ARCH_SELECTOR='^tini-static-arm64$' ; \
