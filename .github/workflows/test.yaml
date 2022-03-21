@@ -1,13 +1,14 @@
 name: Run Tests
 
+# do not run automatically
 on:
-  push:
-  pull_request:
   workflow_call:
   workflow_dispatch:
 
+
 jobs:
   test:
+    name: Run Tests
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -26,34 +27,52 @@ jobs:
     env:
       FISSION_DOCKER_INIT: ${{ matrix.init }}
     steps:
-    -
+    - 
       name: Fetch Dependencies
       run: sudo apt install -qq -y jq moreutils
-
     - 
       name: Clone
       uses: actions/checkout@v2
-    -
+    - 
+      name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+    - 
+      name: Fetch prebuilt base image
+      uses: actions/download-artifact@v2
+      continue-on-error: true
+      with:
+        name: fission_base_image
+        path: /tmp
+    - 
+      name: Load prebuilt base image
+      continue-on-error: true
+      run: |
+        docker load --input /tmp/fission.tar
+        docker image ls -a
+    - 
       name: Run Tests
       working-directory: test
       env:
         FISSION_PLATFORM: ${{ matrix.platform }}
       run: ./test.bash -t
-
-    - name: "Prepare status artifact [${{ matrix.platform }}][init: ${{ matrix.init }}]"
+    - 
+      name: "Prepare status artifact [${{ matrix.platform }}][init: ${{ matrix.init }}]"
       if: ${{ always() }}
       run: |
         mkdir -p status/init_${{ matrix.init }} &&
         echo '{}' | jq --arg job "${{ matrix.platform }}" '. + {job: $job}' > status/init_${{ matrix.init }}/${{ matrix.platform }}.json
-    - name: Finalize status artifact @success
+    - 
+      name: Finalize status artifact @success
       if: ${{ success() }}
       run: |
         cat status/init_${{ matrix.init }}/${{ matrix.platform }}.json | jq --argjson success true '. + {success: $success}' | sponge status/init_${{ matrix.init }}/${{ matrix.platform }}.json
-    - name: Finalize status artifact @failure
+    - 
+      name: Finalize status artifact @failure
       if: ${{ failure() }}
       run: |
         cat status/init_${{ matrix.init }}/${{ matrix.platform }}.json | jq --argjson success false '. + {success: $success}' | sponge status/init_${{ matrix.init }}/${{ matrix.platform }}.json
-    - name: Upload status artifact [${{ matrix.platform }}.json]
+    - 
+      name: Upload status artifact [${{ matrix.platform }}.json]
       if: ${{ !cancelled() }}
       uses: actions/upload-artifact@v2
       with:

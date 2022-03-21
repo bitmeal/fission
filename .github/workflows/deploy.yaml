@@ -1,4 +1,6 @@
-name: Deploy Container
+# run on master
+
+name: Run Tests and deploy Container
 
 on:
   push:
@@ -9,10 +11,18 @@ on:
   workflow_dispatch:
 
 jobs:
+  build:
+    name: Build fission:base image
+    uses: ./.github/workflows/build.yaml
+
   test:
+    name: Run Tests
+    needs:
+    - build
     uses: ./.github/workflows/test.yaml
 
   prepare:
+    name: Prepare versioning variables from tag
     needs:
       - test
     runs-on: ubuntu-latest
@@ -36,6 +46,7 @@ jobs:
         run: "echo tag string: ${{ steps.version.outputs.num }}; echo is tag: ${{ steps.tag.outputs.truthy }}"
 
   report:
+    name: Build status badges from test status
     if: ${{ always() }}
     runs-on: ubuntu-latest
     strategy:
@@ -49,22 +60,29 @@ jobs:
     needs:
       - test
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup Node.js
+    - 
+      name: Clone
+      uses: actions/checkout@v2
+    - 
+      name: Setup Node.js
       uses: actions/setup-node@v2
       with:
         check-latest: true
-    - name: Fetch Dependencies
+    - 
+      name: Fetch Dependencies
       working-directory: helpers
       run: sudo apt install -qq -y jq && npm ci
-    - name: Fetch matrix jobs status artifacts
+    - 
+      name: Fetch matrix jobs status artifacts
       uses: actions/download-artifact@v2
       with:
         path: platforms
-    - name: Build Matrix Badges
+    - 
+      name: Build Matrix Badges
       run: |
         jq -s '.' platforms/status/init_${{ matrix.init }}/*.json | node helpers/badgebuilder.js > badges_init-${{ matrix.init }}.svg
-    - name: Deploy Badges
+    - 
+      name: Deploy Badges
       uses: exuanbo/actions-deploy-gist@v1
       with:
         token: ${{ secrets.GIST_TOKEN }}
@@ -74,6 +92,7 @@ jobs:
         file_path: ./badges_init-${{ matrix.init }}.svg
 
   docker:
+    name: Push versioned/tagged fission:base docker image to ghcr.io
     needs:
       - test
       - prepare
@@ -93,6 +112,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - 
+        name: Fetch prebuilt base image
+        uses: actions/download-artifact@v2
+        continue-on-error: true
+        with:
+          name: fission_base_image
+          path: /tmp
+      - 
+        name: Load prebuilt base image
+        continue-on-error: true
+        run: |
+          docker load --input /tmp/fission.tar
+          docker image ls -a
       -
         name: Build and push x64 image to ghcr.io
         run: docker buildx build --push --tag "ghcr.io/bitmeal/fission:$([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo latest || echo edge)" $([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo "--tag ghcr.io/bitmeal/fission:${{ needs.prepare.outputs.version }}") .

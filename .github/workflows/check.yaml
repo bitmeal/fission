@@ -1,0 +1,22 @@
+# run on non-master branches, and pull requests
+
+name: Perform automated Checks (non-master-branch events)
+
+on:
+  push:
+    branches-ignore:
+    - master
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build fission:base image
+    uses: ./.github/workflows/build.yaml
+
+  test:
+    name: Run Tests
+    needs:
+    - build
+    uses: ./.github/workflows/test.yaml

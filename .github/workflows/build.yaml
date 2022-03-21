@@ -1,0 +1,31 @@
+name: Build fission:base image
+
+# do not run automatically
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build fission:base image
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Clone
+        uses: actions/checkout@v2
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Build and export
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          tags: fission:base
+          outputs: type=docker,dest=/tmp/fission.tar
+      -
+        name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: fission_base_image
+          path: /tmp/fission.tar
