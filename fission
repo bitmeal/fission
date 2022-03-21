@@ -96,6 +96,15 @@ common_config()
 }
 
 ## supervision helpers
+proc_group_childs()
+{
+	ps -e -o pgid,pid 2>/dev/null | awk -v pgid=${1} '$1 == pgid {print $2}' | tr '\n' ' '
+}
+
+proc_childs()
+{
+	ps -e -o ppid,pid 2>/dev/null | awk -v ppid=${1} '$1 == ppid {print $2}' | tr '\n' ' '
+}
 
 # clean background jobs, but send SIGKILL
 # send SIGKILL to all pids passed as parameter
@@ -168,12 +177,8 @@ runsvdir_term()
 	RUNSVDIR_PID="$(ps -e -o pid,comm | awk '/runsvdir/ { print $1 }')"
 	if [ ! -z "${RUNSVDIR_PID}" ]; then
 		kill -HUP ${RUNSVDIR_PID}
+		wait ${RUNSVDIR_PID} $(proc_childs ${RUNSVDIR_PID}) &>/dev/null
 	fi
-}
-
-proc_group_childs()
-{
-	ps -e -o pgid,pid 2>/dev/null | awk -v pgid=${1} '$1 == pgid {print $2}' | tr '\n' ' '
 }
 
 
@@ -467,14 +472,14 @@ run()
 		log "starting aux process..."
 		
 		eval "${__FISSION_AUXILLIARY}"
-		__FISSISON_EXIT_CODE=$?
+		__FISSION_EXIT_CODE=$?
 
 	else
 		# run primary command in foreground and replace process
 		log "starting main process..."
 		# TODO: remove shell call
 		eval "${__FISSION_PRIMARY}"
-		__FISSISON_EXIT_CODE=$?
+		__FISSION_EXIT_CODE=$?
 	fi
 	
 	# # send sigterm and/or wait for main process
@@ -482,8 +487,9 @@ run()
 	
 	# shutdown services
 	runsvdir_term
-	# wait to trigger cleanup tasks of background shells first
-	cleanup ${__FISSISON_EXIT_CODE}
+	# wait for stream synchronization and triggering of cleanup tasks in background shells
+	sleep 0.1
+	cleanup ${__FISSION_EXIT_CODE}
 }
 
 
