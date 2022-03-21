@@ -59,6 +59,7 @@ jobs:
         context: ./test/platforms/${{ matrix.platform }}
         tags: fission:${{ matrix.platform }}
         platforms: linux/${{ matrix.arch }}
+        load: true
     - 
       name: Run Tests [amd64]
       if: ${{ matrix.platform  != 'arm64' }}
