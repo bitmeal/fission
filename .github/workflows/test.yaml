@@ -12,13 +12,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [alpine, debian, ubuntu, opensuse , fedora, redhat-ubi8, almalinux, rockylinux, amazonlinux]
+        platform: [alpine, debian, ubuntu, opensuse , fedora, redhat-ubi8, almalinux, rockylinux]
         init:     [true, false]
-    #     experimental: [false]
-    #     include:
-    #       - platform: centos
-    #         experimental: true
-    # continue-on-error: ${{ matrix.experimental }}
+        experimental: [false]
+        include:
+          - platform: amazonlinux
+            init: true
+            experimental: true
+          - platform: amazonlinux
+            init: false
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
     env:
       FISSION_DOCKER_INIT: ${{ matrix.init }}
     steps:
