@@ -113,6 +113,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - 
+        # allow step to fail; image will not be reused but be built locally
         name: Fetch prebuilt base image
         uses: actions/download-artifact@v2
         continue-on-error: true
@@ -120,11 +121,10 @@ jobs:
           name: fission_base_image
           path: /tmp
       - 
+        # allow step to fail; image will not be reused but be built locally
         name: Load prebuilt base image
         continue-on-error: true
-        run: |
-          docker load --input /tmp/fission.tar
-          docker image ls -a
+        run: docker load --input /tmp/fission.tar
       -
         name: Build and push x64 image to ghcr.io
         run: docker buildx build --push --tag "ghcr.io/bitmeal/fission:$([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo latest || echo edge)" $([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo "--tag ghcr.io/bitmeal/fission:${{ needs.prepare.outputs.version }}") .

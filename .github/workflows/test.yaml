@@ -37,6 +37,7 @@ jobs:
       name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
     - 
+      # allow step to fail; image will not be reused but be built locally
       name: Fetch prebuilt base image
       uses: actions/download-artifact@v2
       continue-on-error: true
@@ -44,11 +45,10 @@ jobs:
         name: fission_base_image
         path: /tmp
     - 
+      # allow step to fail; image will not be reused but be built locally
       name: Load prebuilt base image
       continue-on-error: true
-      run: |
-        docker load --input /tmp/fission.tar
-        docker image ls -a
+      run: docker load --input /tmp/fission.tar
     - 
       name: Run Tests
       working-directory: test
