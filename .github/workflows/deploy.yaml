@@ -54,9 +54,10 @@ jobs:
       matrix:
         include:
           - init: false
+            arch: amd64
             gist_id: 07de6fdf05546612b9abfbc85a2beafc
-          - init: true
-            gist_id: 8080120d08c7039f90bd2b6b4cb05176
+          # - init: true
+          #   gist_id: 8080120d08c7039f90bd2b6b4cb05176
     needs:
       - test
     steps:
@@ -76,11 +77,12 @@ jobs:
       name: Fetch matrix jobs status artifacts
       uses: actions/download-artifact@v2
       with:
+        name: status_${{ matrix.arch }}_init-${{ matrix.init }}
         path: platforms
     - 
       name: Build Matrix Badges
       run: |
-        jq -s '.' platforms/status/init_${{ matrix.init }}/*.json | node helpers/badgebuilder.js > badges_init-${{ matrix.init }}.svg
+        jq -s '.' platforms/status/*.json | node helpers/badgebuilder.js > badges_${{ matrix.arch }}_init-${{ matrix.init }}.svg
     - 
       name: Deploy Badges
       uses: exuanbo/actions-deploy-gist@v1
@@ -88,8 +90,8 @@ jobs:
         token: ${{ secrets.GIST_TOKEN }}
         gist_id: ${{ matrix.gist_id }}
         gist_description: "https://github.com/bitmeal/fission test job badges for init:${{ matrix.init }}"
-        gist_file_name: fission_badges_init-${{ matrix.init }}.svg
-        file_path: ./badges_init-${{ matrix.init }}.svg
+        gist_file_name: fission_badges_${{ matrix.arch }}_init-${{ matrix.init }}.svg
+        file_path: ./badges_${{ matrix.arch }}_init-${{ matrix.init }}.svg
 
   docker:
     name: Push versioned/tagged fission:base docker image to ghcr.io
@@ -112,19 +114,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - 
-        # allow step to fail; image will not be reused but be built locally
-        name: Fetch prebuilt base image
-        uses: actions/download-artifact@v2
-        continue-on-error: true
-        with:
-          name: fission_base_image
-          path: /tmp
-      - 
-        # allow step to fail; image will not be reused but be built locally
-        name: Load prebuilt base image
-        continue-on-error: true
-        run: docker load --input /tmp/fission.tar
+      # - 
+      #   # allow step to fail; image will not be reused but be built locally
+      #   name: Fetch prebuilt base image
+      #   uses: actions/download-artifact@v2
+      #   continue-on-error: true
+      #   with:
+      #     name: fission_base_image
+      #     path: /tmp
+      # - 
+      #   # allow step to fail; image will not be reused but be built locally
+      #   name: Load prebuilt base image
+      #   continue-on-error: true
+      #   run: docker load --input /tmp/fission.tar
       -
         name: Build and push x64 image to ghcr.io
-        run: docker buildx build --push --tag "ghcr.io/bitmeal/fission:$([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo latest || echo edge)" $([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo "--tag ghcr.io/bitmeal/fission:${{ needs.prepare.outputs.version }}") .
+        run: docker buildx build --push --platform "linux/amd64,linux/arm64" --tag "ghcr.io/bitmeal/fission:$([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo latest || echo edge)" $([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo "--tag ghcr.io/bitmeal/fission:${{ needs.prepare.outputs.version }}") .

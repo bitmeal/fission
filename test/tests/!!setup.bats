@@ -21,3 +21,7 @@ setup() {
     *)          false log "unknown init flag in \${INIT}";;
   esac
 }
+
+@test "info: print container architecture" {
+    skip "$(docker run --rm -v ${CTX}/setup_fission.json:/etc/fission/fission.json ${IMAGE} uname -m)"
+}
