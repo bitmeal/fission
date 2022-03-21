@@ -31,6 +31,8 @@ jobs:
           tags: fission:base
           platforms: linux/${{ matrix.arch }}
           outputs: type=docker,dest=/tmp/fission.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       -
         name: Upload artifact
         uses: actions/upload-artifact@v2

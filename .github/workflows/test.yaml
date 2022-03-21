@@ -59,7 +59,7 @@ jobs:
     - 
       name: Run tests [arm64]
       if: ${{ matrix.platform  == 'arm64' }}
-      uses: uraimo/run-on-arch-action@v2
+      uses: uraimo/run-on-arch-action@v2.1.1
       with:
         arch: aarch64
         distro: ubuntu20.04
