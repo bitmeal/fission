@@ -23,5 +23,5 @@ setup() {
 }
 
 @test "info: print container architecture" {
-    skip "$(docker run --rm -v ${CTX}/setup_fission.json:/etc/fission/fission.json ${IMAGE} uname -m)"
+    skip $(docker run --rm --entrypoint="" ${IMAGE} uname -m)
 }
