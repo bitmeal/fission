@@ -26,7 +26,7 @@ jobs:
           path: /tmp/buildx-cache
           key: buildx-cache-${{ hashFiles('Dockerfile') }}
           restore-keys: |
-            buildx-
+            buildx-cache-
       -
         # cache build in local directory; backed by github cache
         name: Build base images for [amd64][arm64]

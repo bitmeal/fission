@@ -19,8 +19,20 @@ jobs:
         experimental: [false]
         include:
           - platform: amazonlinux
-            init: [true, false]
-            arch: [amd64, arm64]
+            init: true
+            arch: amd64
+            experimental: true
+          - platform: amazonlinux
+            init: true
+            arch: arm64
+            experimental: true
+          - platform: amazonlinux
+            init: false
+            arch: amd64
+            experimental: true
+          - platform: amazonlinux
+            init: false
+            arch: arm64
             experimental: true
     continue-on-error: ${{ matrix.experimental }}
     env:
@@ -62,6 +74,14 @@ jobs:
         cache-from: type=local,src=/tmp/buildx-cache
         push: true
     -
+      name: "Setup test image buildx caching using github cache [${{ matrix.platform }}][${{ matrix.arch }}]"
+      uses: actions/cache@v2
+      with:
+        path: /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
+        key: ${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-${{ hashFiles('./test/platforms/${{ matrix.platform }}/Dockerfile') }}
+        restore-keys: |
+          ${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-
+    -
       name: "Build and load test image: [${{ matrix.platform }}][${{ matrix.arch }}]"
       uses: docker/build-push-action@v2
       with:
@@ -70,6 +90,13 @@ jobs:
         tags: fission:${{ matrix.platform }}
         platforms: linux/${{ matrix.arch }}
         load: true
+        cache-from: type=local,src=/tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
+        cache-to: type=local,dest=/tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-new,mode=max
+    -
+      name: "Move buildx cache [${{ matrix.platform }}][${{ matrix.arch }}]"
+      run: |
+        rm -rf /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
+        mv /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-new /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
     - 
       name: Run Tests [${{ matrix.arch }}]
       # if: ${{ matrix.arch  == 'amd64' }}

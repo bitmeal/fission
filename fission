@@ -592,6 +592,9 @@ main_logger()
 
 
 ### MAIN
+# disable job control
+set +m
+
 ### multicall selector
 case "${FISSION_CALL}" in
 	"fission")          setup_init ${@} ;;
