@@ -24,6 +24,11 @@ if [ -z "${FISSION_DOCKER_INIT}" ]; then
     export FISSION_DOCKER_INIT=false
 fi
 
+## check for architecture
+if [ ! -z "${FISSION_ARCH}" ]; then
+    echo "# FISSION_ARCH: using architecture ${FISSION_ARCH}"
+fi
+
 
 ## run tests
 export LC_COLLATE=C

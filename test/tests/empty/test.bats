@@ -8,7 +8,7 @@ setup() {
 }
 
 @test "config/fission.json: fail on empty file" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE} true
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${ARCH} ${IMAGE} true
 	assert_failure
 }
 

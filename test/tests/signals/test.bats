@@ -9,7 +9,7 @@ setup() {
 
 # @test "signal forwarding: main process with aux - kill 1" {
 #     # calling sh -c needs cheating with "'cmd'"
-#     run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js ${INIT} ${IMAGE} /testbin/signals.js main -- sh -c "'sleep 2; kill 1; tail -F /var/log/app/current 2>/dev/null'"
+#     run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js ${INIT} ${ARCH} ${IMAGE} /testbin/signals.js main -- sh -c "'sleep 2; kill 1; tail -F /var/log/app/current 2>/dev/null'"
 #     assert_success
 
 #     assert_line --partial '[stdout] [SIGTERM] main'
@@ -18,7 +18,7 @@ setup() {
 
 @test "signal forwarding: exiting aux process signals SIGTERM to main; assert stderr forwarding mechanism lifetime" {
     # trigger SIGTERM to main by exiting aux
-    run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js ${INIT} ${IMAGE} /testbin/signals.js main -- sleep 2
+    run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js ${INIT} ${ARCH} ${IMAGE} /testbin/signals.js main -- sleep 2
     assert_success
     
     refute_output
@@ -36,7 +36,7 @@ setup() {
     # send SIGTERM in 10 seconds
     ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) &
     # run test container
-    run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js --name ${CONTAINER_ID} ${INIT} ${IMAGE} /testbin/signals.js main    
+    run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js --name ${CONTAINER_ID} ${INIT} ${ARCH} ${IMAGE} /testbin/signals.js main    
 
 
     assert_success
@@ -56,7 +56,7 @@ setup() {
     # send SIGTERM in 10 seconds
     ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) >/dev/null 2>/dev/null &
     # run test container
-    run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js --name ${CONTAINER_ID} ${INIT} ${IMAGE} /testbin/signals.js main -- /testbin/signals.js aux
+    run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js --name ${CONTAINER_ID} ${INIT} ${ARCH} ${IMAGE} /testbin/signals.js main -- /testbin/signals.js aux
     # assert_success
     
     assert_line --partial '[stdout] [SIGTERM] aux'
@@ -75,7 +75,7 @@ setup() {
     # send SIGTERM in 10 seconds
     ( sleep 10; docker kill -s SIGTERM ${CONTAINER_ID} ) >/dev/null 2>/dev/null &
     # run test container: make main terminate delayed by 1 second to keep streams open
-    run --separate-stderr -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js -v ${CTX}/delaysigexit.js:/testbin/delaysigexit.js --name ${CONTAINER_ID} ${INIT} ${IMAGE} /testbin/delaysigexit.js 1000
+    run --separate-stderr -- docker run --rm -v ${CTX}/services.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js -v ${CTX}/delaysigexit.js:/testbin/delaysigexit.js --name ${CONTAINER_ID} ${INIT} ${ARCH} ${IMAGE} /testbin/delaysigexit.js 1000
     assert_success
 
     # use stderr with bats_assert

@@ -84,7 +84,7 @@ jobs:
       with:
         env: |
           FISSION_PLATFORM: ${{ matrix.platform }}
-          DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
+          FISSION_ARCH: linux/${{ matrix.arch }}
         arch: aarch64
         distro: ubuntu20.04
         run: |

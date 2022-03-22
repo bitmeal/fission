@@ -23,5 +23,5 @@ setup() {
 }
 
 @test "info: print container architecture" {
-    skip $(docker run --rm --entrypoint="" ${IMAGE} uname -m)
+    skip $(docker run --rm --entrypoint="" ${ARCH} ${IMAGE} uname -m)
 }

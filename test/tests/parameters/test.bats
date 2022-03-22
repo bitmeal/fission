@@ -8,7 +8,7 @@ setup() {
 }
 
 @test "arguments: fail and show usage on EMPTY main command" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE}
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${ARCH} ${IMAGE}
     assert_failure
     
     assert_line --index 0 --regexp '^usage:.*$'
@@ -16,7 +16,7 @@ setup() {
 }
 
 @test "arguments: fail and show usage on EMPTY main command + EMPTY aux command" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE} --
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${ARCH} ${IMAGE} --
     assert_failure
     
     assert_line --index 0 --regexp '^usage:.*$'
@@ -24,7 +24,7 @@ setup() {
 }
 
 @test "arguments: fail and show usage on EMPTY main command + aux command" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE} -- true
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${ARCH} ${IMAGE} -- true
     assert_failure
     
     assert_line --index 0 --regexp '^usage:.*$'
@@ -32,7 +32,7 @@ setup() {
 }
 
 @test "arguments: success on main command + -- [EMPTY aux command]" {
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${IMAGE} true --
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true ${INIT} ${ARCH} ${IMAGE} true --
     assert_success
     
     assert_line --partial 'starting main process'

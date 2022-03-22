@@ -14,19 +14,22 @@ _common_setup() {
 
     INIT=$(if ${FISSION_DOCKER_INIT}; then echo "--init"; fi)
     # print "[${BATS_TEST_NAME}] using init flag: ${INIT}"
+
+    ARCH=$(if [ ! -z "${FISSION_ARCH}" ]; then echo "--platform ${FISSION_ARCH}"; fi)
+    # print "[${BATS_TEST_NAME}] using arch: ${FISSION_ARCH} / flag '${ARCH}'"
 }
 
 # test for image availability and build if not
 _ensure_baseimage() {
     if ! docker image inspect fission:base; then
-        docker build -t fission:base .. || (print "error building base docker image"; exit 1)
+        docker build ${ARCH} -t fission:base .. || (print "error building base docker image"; exit 1)
     fi
 }
 
 _ensure_image() {
     if ! docker image inspect ${IMAGE}; then
         _ensure_baseimage
-        docker build -t ${IMAGE} platforms/${FISSION_PLATFORM} || (print "error building docker image for ${FISSION_PLATFORM}"; exit 1)
+        docker build ${ARCH} -t ${IMAGE} platforms/${FISSION_PLATFORM} || (print "error building docker image for ${FISSION_PLATFORM}"; exit 1)
     fi
 }
 

@@ -10,7 +10,7 @@ setup() {
 @test "detect and reuse docker-init from 'docker run --init'" {
     # CTX is test file location
     # IMAGE is docker image:tag for platform to test
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true --init ${IMAGE} ps -f
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json -e FISSION_VERBOSE=true --init ${ARCH} ${IMAGE} ps -f
     assert_success
     
     assert_line --partial 'docker --init'
