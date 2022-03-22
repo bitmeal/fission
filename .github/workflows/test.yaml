@@ -72,18 +72,19 @@ jobs:
         load: true
     - 
       name: Run Tests [amd64]
-      if: ${{ matrix.platform  != 'arm64' }}
+      if: ${{ matrix.platform  == 'amd64' }}
       working-directory: test
       env:
         FISSION_PLATFORM: ${{ matrix.platform }}
       run: ./test.bash -t
     - 
       name: Run tests [arm64]
-      if: ${{ matrix.platform  == 'arm64' }}
+      if: ${{ matrix.platform  != 'amd64' }}
       uses: uraimo/run-on-arch-action@v2.1.1
       with:
         env: |
           FISSION_PLATFORM: ${{ matrix.platform }}
+          DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.platform }}
         arch: aarch64
         distro: ubuntu20.04
         run: |

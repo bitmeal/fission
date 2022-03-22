@@ -24,9 +24,8 @@ _ensure_baseimage() {
 }
 
 _ensure_image() {
-    _ensure_baseimage
-    
     if ! docker image inspect ${IMAGE}; then
+        _ensure_baseimage
         docker build -t ${IMAGE} platforms/${FISSION_PLATFORM} || (print "error building docker image for ${FISSION_PLATFORM}"; exit 1)
     fi
 }
