@@ -1,3 +1,8 @@
+# allow to pull image from registry by giving build arg
+ARG FISSION_BASE="fission:base"
+FROM ${FISSION_BASE} AS fission_provider
+
+# build test image
 FROM alpine:latest
 
 
@@ -6,7 +11,7 @@ FROM alpine:latest
 RUN apk add nodejs npm && npm install -g chalk
 
 # add fission init
-COPY --from=fission:base / /
+COPY --from=fission_provider / /
 
 # use fission init
 ENTRYPOINT ["/opt/fission/bin/fission"]
