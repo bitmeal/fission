@@ -150,6 +150,9 @@ schedule_killup()
 # cleanup helper/signal-handler to terminate (SIGTERM) jobs of current shell + escalation to SIGKILL after timeout
 cleanup()
 {
+	# wait for output stream sync from prior jobs
+	sleep 0.1
+	
 	# get running jobs
 	jobs &>/dev/null
 	PIDS=$(jobs -p 2>/dev/null)
@@ -163,6 +166,9 @@ cleanup()
 		
 		log_verbose "waiting for response to SIGTERM from pids: $(echo ${PIDS})"
 		wait $(echo ${PIDS}) &>/dev/null
+
+		# wait for output stream sync from prior jobs
+		sleep 0.1
 
 		if [ ! -z "${1}" ]; then
 			log "forwarding exit code: ${1}"
@@ -290,7 +296,7 @@ select_shell()
 	# respawn with shell from /etc/passwd
 	if [ -z ${FISSION_SHELL} ]; then
 		export FISSION_SHELL=$(getent passwd $(whoami) | cut -d ':' -f 7)
-		log "replacing /bin/sh as executor with ${FISSION_SHELL}..."
+		log "replacing '/usr/bin/env sh' as executor with ${FISSION_SHELL}..."
 	fi
 
 	exec ${FISSION_SHELL} ${FISSION_PATH}/fission-run ${@}
@@ -386,9 +392,9 @@ run()
 		chmod +x "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/run"
 
 		# (re)create logger
-		echo "#!${FISSION_SHELL}" > "${__FISSION_RUNSVDIR}/${__FISSION_SERVICE}/log/run"
 		read -r -d '' __SV_LOG_SCRIPT <<-EOF
 			#!${FISSION_SHELL}
+			set +m
 			exec 2>${__FISSION_STDERR_TARGET}
 			# will be killed by broken pipes?
 			trap ' ' SIGINT SIGTERM
@@ -485,10 +491,8 @@ run()
 	# # send sigterm and/or wait for main process
 	log "foreground process exited sending SIGTERM and waiting for services and background operations..."
 	
-	# shutdown services
+	# shutdown
 	runsvdir_term
-	# wait for stream synchronization and triggering of cleanup tasks in background shells
-	sleep 0.1
 	cleanup ${__FISSION_EXIT_CODE}
 }
 
@@ -526,6 +530,7 @@ runsv_redirect()
     # wait for command to finish (keep process running and forward signals)
     wait $(proc_group_childs ${__PROC_GROUP_ID}) &>/dev/null
     wait &>/dev/null
+
     cleanup
 }
 
@@ -569,6 +574,7 @@ main_logger()
 
 	# attach logger
 	read -r -d '' __LOGGER_CMDLINE <<-EOF
+		set +m
 		exec 2>${__FISSION_STDERR_TARGET}
 		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk ${__FISSION_AWK_OPTIONS} -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print ${__FISSION_AWK_FLUSH}}' >&2
 		#> ${__FISSION_STDERR_TARGET}
