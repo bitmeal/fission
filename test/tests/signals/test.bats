@@ -8,8 +8,7 @@ setup() {
 }
 
 # @test "signal forwarding: main process with aux - kill 1" {
-#     # calling sh -c needs cheating with "'cmd'"
-#     run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js ${INIT} ${ARCH} ${IMAGE} /testbin/signals.js main -- sh -c "'sleep 2; kill 1; tail -F /var/log/app/current 2>/dev/null'"
+#     run --separate-stderr -- docker run --rm -v ${CTX}/mainaux.json:/etc/fission/fission.json -v ${CTX}/signals.js:/testbin/signals.js ${INIT} ${ARCH} ${IMAGE} /testbin/signals.js main -- sh -c "sleep 2; kill 1; tail -F /var/log/app/current 2>/dev/null"
 #     assert_success
 
 #     assert_line --partial '[stdout] [SIGTERM] main'

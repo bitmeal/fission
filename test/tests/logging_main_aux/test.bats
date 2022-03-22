@@ -15,8 +15,7 @@ setup() {
 }
 
 @test "aux process: main process redirected to logfile (output in logfile)" {
-    # calling sh -c needs cheating with "'cmd'"
-    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${INIT} ${ARCH} ${IMAGE} echo fission-init -- sh -c "'sleep 1; cat /var/log/app/current'"
+    run --separate-stderr -- docker run --rm -v ${CTX}/fission.json:/etc/fission/fission.json ${INIT} ${ARCH} ${IMAGE} echo fission-init -- sh -c "sleep 1; cat /var/log/app/current"
     assert_success
     
     assert_line --index 0 --partial 'fission-init'

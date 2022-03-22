@@ -55,6 +55,13 @@ _passback()
 	done
 }
 
+set_shell_opts()
+{
+	# disable job control and notification
+	set +o monitor
+	set +o notify
+}
+
 common_config()
 {
 	# verbosity
@@ -180,9 +187,12 @@ cleanup()
 # rewrite signals to terminate runsvdir
 runsvdir_term()
 {
+	# suppress job output
+	jobs 2>/dev/null &>/dev/null
+
 	RUNSVDIR_PID="$(ps -e -o pid,comm | awk '/runsvdir/ { print $1 }')"
 	if [ ! -z "${RUNSVDIR_PID}" ]; then
-		kill -HUP ${RUNSVDIR_PID}
+		kill -HUP ${RUNSVDIR_PID} &>/dev/null
 		wait ${RUNSVDIR_PID} $(proc_childs ${RUNSVDIR_PID}) &>/dev/null
 	fi
 }
@@ -299,7 +309,7 @@ select_shell()
 		log "replacing '/usr/bin/env sh' as executor with ${FISSION_SHELL}..."
 	fi
 
-	exec ${FISSION_SHELL} ${FISSION_PATH}/fission-run ${@}
+	exec ${FISSION_SHELL} ${FISSION_PATH}/fission-run "${@}"
 }
 
 
@@ -394,7 +404,6 @@ run()
 		# (re)create logger
 		read -r -d '' __SV_LOG_SCRIPT <<-EOF
 			#!${FISSION_SHELL}
-			set +m
 			exec 2>${__FISSION_STDERR_TARGET}
 			# will be killed by broken pipes?
 			trap ' ' SIGINT SIGTERM
@@ -451,7 +460,7 @@ run()
 
 	# build primary command till '--' or end of options
 	while [ ${#} -ne 0 ] && [ "${1}" != "--" ]; do
-		__FISSION_PRIMARY="${__FISSION_PRIMARY} ${1}"
+		__FISSION_PRIMARY="${__FISSION_PRIMARY} \"${1}\""
 		shift
 	done
 	log_verbose "main cmdl: ${__FISSION_PRIMARY}"
@@ -460,14 +469,14 @@ run()
 	if [ "${1}" = "--" ] && [ ${#} -gt 1 ]; then
 		# run primary command in background
 		log "starting main process in background [logging to ${__FISSION_LOGDIR}/app]..."        
-		${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain ${__FISSION_PRIMARY} &
+		${FISSION_SHELL} ${FISSION_PATH}/fission-auxmain "${__FISSION_PRIMARY}" &
 
 		shift
 
 		# build auxilliary command
 		# __FISSION_AUXILLIARY=${@}
 		while [ ${#} -ne 0 ]; do
-			__FISSION_AUXILLIARY="${__FISSION_AUXILLIARY} ${1}"
+			__FISSION_AUXILLIARY="${__FISSION_AUXILLIARY} \"${1}\""
 			shift
 		done
 		log_verbose "aux cmdl: ${__FISSION_AUXILLIARY}"
@@ -477,14 +486,14 @@ run()
 		# run aux process
 		log "starting aux process..."
 		
-		eval "${__FISSION_AUXILLIARY}"
+		eval ${__FISSION_AUXILLIARY}
 		__FISSION_EXIT_CODE=$?
 
 	else
 		# run primary command in foreground and replace process
 		log "starting main process..."
 		# TODO: remove shell call
-		eval "${__FISSION_PRIMARY}"
+		eval ${__FISSION_PRIMARY}
 		__FISSION_EXIT_CODE=$?
 	fi
 	
@@ -558,6 +567,8 @@ main_logger()
 	# rm ${__PIPE}
 	#------------------------------------------------------
 	
+	set_shell_opts
+
 	read -r -d '' __MAIN_CMDLINE <<-EOF
 		{ exec ${@} | setsid awk ${__FISSION_AWK_OPTIONS} '\$0="O: "\$0 ${__FISSION_AWK_FLUSH}' >&127; } 2>&1 | setsid awk ${__FISSION_AWK_OPTIONS} '\$0="E: "\$0 ${__FISSION_AWK_FLUSH}' >&127
 		EOF
@@ -574,7 +585,6 @@ main_logger()
 
 	# attach logger
 	read -r -d '' __LOGGER_CMDLINE <<-EOF
-		set +m
 		exec 2>${__FISSION_STDERR_TARGET}
 		svlogd -tt ${__FISSION_LOGDIR}/app 2>&1 | awk ${__FISSION_AWK_OPTIONS} -v name="${__MAIN_LOGGER_NAME}" '{\$1=""; \$2=""; sub(/^\s*/, "[" name "] "); print ${__FISSION_AWK_FLUSH}}' >&2
 		#> ${__FISSION_STDERR_TARGET}
@@ -598,16 +608,15 @@ main_logger()
 
 
 ### MAIN
-# disable job control
-set +m
+set_shell_opts
 
 ### multicall selector
 case "${FISSION_CALL}" in
-	"fission")          setup_init ${@} ;;
-	"fission-spawn")    select_shell ${@} ;;
-	"fission-run")      run ${@} ;;
-	"fission-runsv")    runsv_redirect ${@} ;;
-	"fission-auxmain")  main_logger ${@} ;;
-	"fission-getconf")  get_conf ${@} ;;
+	"fission")          setup_init "${@}" ;;
+	"fission-spawn")    select_shell "${@}" ;;
+	"fission-run")      run "${@}" ;;
+	"fission-runsv")    runsv_redirect "${@}" ;;
+	"fission-auxmain")  main_logger "${@}" ;;
+	"fission-getconf")  get_conf "${@}" ;;
 	*)                  echo "fission called as unknown command" >&2; exit 1;;
 esac
