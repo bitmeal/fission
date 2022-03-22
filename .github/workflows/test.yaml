@@ -71,25 +71,26 @@ jobs:
         platforms: linux/${{ matrix.arch }}
         load: true
     - 
-      name: Run Tests [amd64]
-      if: ${{ matrix.arch  == 'amd64' }}
+      name: Run Tests [${{ matrix.arch }}]
+      # if: ${{ matrix.arch  == 'amd64' }}
       working-directory: test
       env:
         FISSION_PLATFORM: ${{ matrix.platform }}
+        FISSION_ARCH: linux/${{ matrix.arch }}
       run: ./test.bash -t
-    - 
-      name: Run tests [arm64]
-      if: ${{ matrix.arch  != 'amd64' }}
-      uses: uraimo/run-on-arch-action@v2.1.1
-      with:
-        env: |
-          FISSION_PLATFORM: ${{ matrix.platform }}
-          FISSION_ARCH: linux/${{ matrix.arch }}
-        arch: aarch64
-        distro: ubuntu20.04
-        run: |
-          cd test
-          ./test.bash -t
+    # - 
+    #   name: Run tests [arm64]
+    #   if: ${{ matrix.arch  != 'amd64' }}
+    #   uses: uraimo/run-on-arch-action@v2.1.1
+    #   with:
+    #     env: |
+    #       FISSION_PLATFORM: ${{ matrix.platform }}
+    #       FISSION_ARCH: linux/${{ matrix.arch }}
+    #     arch: aarch64
+    #     distro: ubuntu20.04
+    #     run: |
+    #       cd test
+    #       ./test.bash -t
     - 
       name: "Prepare status artifact [${{ matrix.platform }}][init: ${{ matrix.init }}][arch: ${{ matrix.arch }}] ([status_${{ matrix.arch }}_init-${{ matrix.init }}])"
       if: ${{ always() }}
