@@ -45,11 +45,11 @@ jobs:
       uses: docker/setup-buildx-action@v1
     - 
       # allow step to fail; image will not be reused but be built locally
-      name: Fetch buildx cache from artifact
+      name: Fetch and restore buildx cache from artifact
       uses: actions/download-artifact@v2
       with:
         name: buildx-cache-${{ hashFiles('Dockerfile') }}
-        path: /tmp
+        path: /tmp/buildx-cache
     -
       name: Rebuild base images for [amd64][arm64] from CACHE and push to local registry
       uses: docker/build-push-action@v2
