@@ -75,10 +75,11 @@ jobs:
         push: true
     -
       name: "Setup test image buildx caching using github cache [${{ matrix.platform }}][${{ matrix.arch }}]"
+      if: ${{ ! endsWith(github.event.head_commit.message, '[nocache]') && ! endsWith(github.event.head_commit.message, '[no-cache]') }}
       uses: actions/cache@v2
       with:
         path: /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
-        key: ${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-${{ hashFiles('./test/platforms/${{ matrix.platform }}/Dockerfile') }}
+        key: ${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-${{ hashFiles(format('test/platforms/{0}/Dockerfile', matrix.platform)) }}
         restore-keys: |
           ${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-
     -
