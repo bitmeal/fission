@@ -102,6 +102,7 @@ jobs:
           flavor: |
             latest=auto
           tags: |
+            type=raw,value=edge
             type=edge,branch=master
             type=sha,branch=master
             type=semver,pattern={{raw}}
