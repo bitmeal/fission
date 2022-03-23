@@ -102,7 +102,11 @@ jobs:
           flavor: |
             latest=auto
           tags: |
-            type=edge
+            type=edge,branch=master
+            type=sha,branch=master
+            type=semver,pattern={{raw}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
       -
         name: Reuse buildx cache from tested image
         uses: actions/cache@v2

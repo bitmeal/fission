@@ -66,6 +66,7 @@ jobs:
           ${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-
     -
       name: "Build and load test image: [${{ matrix.platform }}][${{ matrix.arch }}]"
+      timeout-minutes: 10
       uses: docker/build-push-action@v2
       with:
         context: ./test/platforms/${{ matrix.platform }}
@@ -82,7 +83,7 @@ jobs:
         mv /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-new /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
     - 
       name: Run Tests [${{ matrix.arch }}]
-      timeout-minutes: 15
+      timeout-minutes: 10
       working-directory: test
       env:
         FISSION_PLATFORM: ${{ matrix.platform }}
