@@ -35,7 +35,7 @@ The *"PID1-problem"*, zombie processes, signal forwarding and running multiple p
 # Dockerfile
 FROM <your-base>
 
-# get fission-init
+# get fission-init (amd64/x86_64 and arm64/aarch64)
 COPY --from=ghcr.io/bitmeal/fission:latest / /
 
 #...
@@ -171,8 +171,5 @@ find tests and documentation in `./test`. Tests use *bats* for testing, but are 
 * bash
 * `uuidgen` or `/proc/sys/kernel/random/uuid`
 
----
-## TODO
-* service signal forwarding tests
 
 

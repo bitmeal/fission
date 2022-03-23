@@ -13,28 +13,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [alpine, debian, ubuntu, opensuse , fedora, redhat-ubi8, almalinux, rockylinux]
+        platform: [alpine, debian, ubuntu, opensuse , fedora, redhat-ubi8, almalinux, rockylinux, amazonlinux]
         init:     [true, false]
         arch:     [amd64, arm64]
         experimental: [false]
-        include:
-          - platform: amazonlinux
-            init: true
-            arch: amd64
-            experimental: true
-          - platform: amazonlinux
-            init: true
-            arch: arm64
-            experimental: true
-          - platform: amazonlinux
-            init: false
-            arch: amd64
-            experimental: true
-          - platform: amazonlinux
-            init: false
-            arch: arm64
-            experimental: true
-    continue-on-error: ${{ matrix.experimental }}
+    # require only amd64 and tini in container to pass
+    continue-on-error: ${{ matrix.experimental || matrix.arch == 'arm64' || matrix.init }}
     env:
       FISSION_DOCKER_INIT: ${{ matrix.init }}
     services:
