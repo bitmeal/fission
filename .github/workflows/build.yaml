@@ -21,13 +21,17 @@ jobs:
         uses: docker/setup-buildx-action@v1
       -
         name: Setup buildx caching using github cache
-        if: ${{ ! endsWith(github.event.head_commit.message, '[nocache]') && ! endsWith(github.event.head_commit.message, '[no-cache]') }}
         uses: actions/cache@v2
         with:
           path: /tmp/buildx-cache
           key: buildx-cache-${{ hashFiles('Dockerfile') }}
           restore-keys: |
             buildx-cache-
+      -
+        name: Clear cache (on request)
+        if: ${{ endsWith(github.event.head_commit.message, '[nocache]') || endsWith(github.event.head_commit.message, '[no-cache]') }}
+        run: |
+          rm -rf /tmp/buildx-cache/*
       -
         # cache build in local directory; backed by github cache
         name: Build base images for [amd64][arm64]

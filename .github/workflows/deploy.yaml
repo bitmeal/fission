@@ -21,30 +21,6 @@ jobs:
     - build
     uses: ./.github/workflows/test.yaml
 
-  prepare:
-    name: Prepare versioning variables from tag
-    needs:
-      - test
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.num }}
-      tag: ${{ steps.tag.outputs.truthy }}
-    steps:
-      -
-        name: Clone
-        uses: actions/checkout@v2
-      -
-        name: Get Version
-        id: version
-        run: echo ::set-output name=num::${GITHUB_REF#refs/*/}
-      -
-        name: Is Tag?
-        id: tag
-        run: echo ::set-output name=truthy::$([[ ${{ steps.version.outputs.num }} =~ ^v([0-9]+\.){2}[0-9]+([-\+].*)?$ ]] && echo 'true' || echo 'false')
-      -
-        name: Log Output
-        run: "echo tag string: ${{ steps.version.outputs.num }}; echo is tag: ${{ steps.tag.outputs.truthy }}"
-
   report:
     name: Build status badges from test status
     if: ${{ always() }}
@@ -78,11 +54,11 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: status_${{ matrix.arch }}_init-${{ matrix.init }}
-        path: platforms
+        path: status
     - 
       name: Build Matrix Badges
       run: |
-        jq -s '.' platforms/status/*.json | node helpers/badgebuilder.js > badges_${{ matrix.arch }}_init-${{ matrix.init }}.svg
+        jq -s '.' status/*.json | node helpers/badgebuilder.js > badges_${{ matrix.arch }}_init-${{ matrix.init }}.svg
     - 
       name: Deploy Badges
       uses: exuanbo/actions-deploy-gist@v1
@@ -97,12 +73,14 @@ jobs:
     name: Push versioned/tagged fission:base docker image to ghcr.io
     needs:
       - test
-      - prepare
     runs-on: ubuntu-latest
     steps:
       -
         name: Clone
         uses: actions/checkout@v2
+      - 
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
       -
         name: Set up Docker Buildx
         id: buildx
@@ -114,19 +92,35 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # - 
-      #   # allow step to fail; image will not be reused but be built locally
-      #   name: Fetch prebuilt base image
-      #   uses: actions/download-artifact@v2
-      #   continue-on-error: true
-      #   with:
-      #     name: fission_base_image
-      #     path: /tmp
-      # - 
-      #   # allow step to fail; image will not be reused but be built locally
-      #   name: Load prebuilt base image
-      #   continue-on-error: true
-      #   run: docker load --input /tmp/fission.tar
+      -
+        name: Setup tags
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: |
+            ghcr.io/bitmeal/fission
+          flavor: |
+            latest=auto
+          tags: |
+            type=edge
+      -
+        name: Reuse buildx cache from tested image
+        uses: actions/cache@v2
+        with:
+          path: /tmp/buildx-cache
+          key: buildx-cache-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            buildx-cache-
+      -
+        name: Build and push images to ghcr.io for [amd64][arm64]
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=local,src=/tmp/buildx-cache
+          push: true
       -
         name: Build and push x64 image to ghcr.io
         run: docker buildx build --push --platform "linux/amd64,linux/arm64" --tag "ghcr.io/bitmeal/fission:$([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo latest || echo edge)" $([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo "--tag ghcr.io/bitmeal/fission:${{ needs.prepare.outputs.version }}") .
