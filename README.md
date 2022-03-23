@@ -1,6 +1,6 @@
 # 💥 fission init
 
-[![badges_init-false](https://gist.githubusercontent.com/bitmeal/07de6fdf05546612b9abfbc85a2beafc/raw/dcaea46ba38461921a176b5f798a70b26124ae7b/fission_badges_amd64_init-false.svg)](https://github.com/bitmeal/fission/actions/workflows/test.yaml)
+[![badges_init-false](https://gist.githubusercontent.com/bitmeal/07de6fdf05546612b9abfbc85a2beafc/raw/fission_badges_amd64_init-false.svg)](https://github.com/bitmeal/fission/actions/workflows/test.yaml)
 
 > multi-process docker init stack. *lightweight, simple and without reinventing the wheel*
 

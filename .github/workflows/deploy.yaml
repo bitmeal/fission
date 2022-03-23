@@ -121,6 +121,3 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=local,src=/tmp/buildx-cache
           push: true
-      -
-        name: Build and push x64 image to ghcr.io
-        run: docker buildx build --push --platform "linux/amd64,linux/arm64" --tag "ghcr.io/bitmeal/fission:$([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo latest || echo edge)" $([[ ${{ needs.prepare.outputs.tag }} == 'true' ]] && echo "--tag ghcr.io/bitmeal/fission:${{ needs.prepare.outputs.version }}") .
