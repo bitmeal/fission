@@ -19,8 +19,6 @@ jobs:
         experimental: [false]
     # require only amd64 and tini in container to pass
     continue-on-error: ${{ matrix.experimental || matrix.arch == 'arm64' || matrix.init }}
-    env:
-      FISSION_DOCKER_INIT: ${{ matrix.init }}
     services:
       registry:
         image: registry:2
@@ -84,25 +82,13 @@ jobs:
         mv /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache-new /tmp/${{ matrix.platform }}-${{ matrix.arch }}-buildx-cache
     - 
       name: Run Tests [${{ matrix.arch }}]
-      # if: ${{ matrix.arch  == 'amd64' }}
+      timeout-minutes: 15
       working-directory: test
       env:
         FISSION_PLATFORM: ${{ matrix.platform }}
         FISSION_ARCH: linux/${{ matrix.arch }}
+        FISSION_DOCKER_INIT: ${{ matrix.init }}
       run: ./test.bash -t
-    # - 
-    #   name: Run tests [arm64]
-    #   if: ${{ matrix.arch  != 'amd64' }}
-    #   uses: uraimo/run-on-arch-action@v2.1.1
-    #   with:
-    #     env: |
-    #       FISSION_PLATFORM: ${{ matrix.platform }}
-    #       FISSION_ARCH: linux/${{ matrix.arch }}
-    #     arch: aarch64
-    #     distro: ubuntu20.04
-    #     run: |
-    #       cd test
-    #       ./test.bash -t
     - 
       name: "Prepare status artifact [${{ matrix.platform }}][init: ${{ matrix.init }}][arch: ${{ matrix.arch }}] ([status_${{ matrix.arch }}_init-${{ matrix.init }}])"
       if: ${{ always() }}
